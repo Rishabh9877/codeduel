@@ -143,13 +143,17 @@ export async function POST(req: Request) {
       const newWinnerElo = calcElo(liveWinnerElo, liveLoserElo, true);
       const newLoserElo = calcElo(liveLoserElo, liveWinnerElo, false);
 
-      console.log(`[SUBMIT Step 4] DynamoDB transaction compiled — winnerId=${winner.userId}, loserId=${loser.userId}, liveWinnerElo=${liveWinnerElo}→${newWinnerElo}, liveLoserElo=${liveLoserElo}→${newLoserElo}`);
+      const winnerWins = (Number(winnerProfileResult.Item?.wins) || 0) + 1;
+      const winnerLosses = Number(winnerProfileResult.Item?.losses) || 0;
+      const loserWins = Number(loserProfileResult.Item?.wins) || 0;
+      const loserLosses = (Number(loserProfileResult.Item?.losses) || 0) + 1;
 
-      // Secure atomic multi-item cloud transaction with concurrency verification expressions
+      console.log(`[SUBMIT Step 4] Committing match victory: winnerId=${winner.userId} (${liveWinnerElo} -> ${newWinnerElo}), loserId=${loser.userId} (${liveLoserElo} -> ${newLoserElo})`);
+
       await dynamo.send(
         new TransactWriteCommand({
           TransactItems: [
-            // Mark match finished
+            // 1. Mark match finished
             {
               Update: {
                 TableName: TABLE,
@@ -168,22 +172,25 @@ export async function POST(req: Request) {
               },
             },
 
-            // Winner profile (Protected via Optimistic Locking condition check)
+            // 2. Winner profile update
             {
-              Update: {
+              Put: {
                 TableName: TABLE,
-                Key: { PK: `USER#${winner.userId}`, SK: "PROFILE" },
-                UpdateExpression: "SET elo = :newElo ADD wins :one",
-                ConditionExpression: "elo = :liveElo", // Must match the Pre-Flight live read!
-                ExpressionAttributeValues: {
-                  ":newElo": newWinnerElo,
-                  ":liveElo": liveWinnerElo,
-                  ":one": 1
-                }
-              }
+                Item: {
+                  PK: `USER#${winner.userId}`,
+                  SK: "PROFILE",
+                  userId: winner.userId,
+                  username: winner.username,
+                  avatar: winner.avatar ?? null,
+                  elo: newWinnerElo,
+                  wins: winnerWins,
+                  losses: winnerLosses,
+                  createdAt: winnerProfileResult.Item?.createdAt ?? now,
+                },
+              },
             },
 
-            // Winner leaderboard entry
+            // 3. Winner leaderboard entry
             {
               Put: {
                 TableName: TABLE,
@@ -194,26 +201,32 @@ export async function POST(req: Request) {
                   GSI1SK: newWinnerElo,
                   userId: winner.userId,
                   username: winner.username,
+                  avatar: winner.avatar ?? null,
+                  wins: winnerWins,
+                  losses: winnerLosses,
                 },
               },
             },
 
-            // Loser profile (Protected via Optimistic Locking condition check)
+            // 4. Loser profile update
             {
-              Update: {
+              Put: {
                 TableName: TABLE,
-                Key: { PK: `USER#${loser.userId}`, SK: "PROFILE" },
-                UpdateExpression: "SET elo = :newElo ADD losses :one",
-                ConditionExpression: "elo = :liveElo", // Must match the Pre-Flight live read!
-                ExpressionAttributeValues: {
-                  ":newElo": newLoserElo,
-                  ":liveElo": liveLoserElo,
-                  ":one": 1
-                }
-              }
+                Item: {
+                  PK: `USER#${loser.userId}`,
+                  SK: "PROFILE",
+                  userId: loser.userId,
+                  username: loser.username,
+                  avatar: loser.avatar ?? null,
+                  elo: newLoserElo,
+                  wins: loserWins,
+                  losses: loserLosses,
+                  createdAt: loserProfileResult.Item?.createdAt ?? now,
+                },
+              },
             },
 
-            // Loser leaderboard entry
+            // 5. Loser leaderboard entry
             {
               Put: {
                 TableName: TABLE,
@@ -224,6 +237,9 @@ export async function POST(req: Request) {
                   GSI1SK: newLoserElo,
                   userId: loser.userId,
                   username: loser.username,
+                  avatar: loser.avatar ?? null,
+                  wins: loserWins,
+                  losses: loserLosses,
                 },
               },
             },

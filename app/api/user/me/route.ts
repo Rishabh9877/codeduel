@@ -1,24 +1,61 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { dynamo, TABLE } from "@/lib/dynamo";
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!(session?.user as any)?.id) {
+  const userId = ((session?.user as any)?.id || (session?.user as any)?.sub) as string | undefined;
+
+  if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const result = await dynamo.send(
+    let result = await dynamo.send(
       new GetCommand({
         TableName: TABLE,
-        Key: { PK: `USER#${(session.user as any).id}`, SK: "PROFILE" },
+        Key: { PK: `USER#${userId}`, SK: "PROFILE" },
       })
     );
 
+    // Auto-provision profile on first read if not yet in database
     if (!result.Item) {
-      return Response.json({ error: "User not found" }, { status: 404 });
+      const username = session.user?.name ?? "Developer";
+      const avatar = session.user?.image ?? null;
+      const initialItem = {
+        PK: `USER#${userId}`,
+        SK: "PROFILE",
+        userId,
+        username,
+        email: session.user?.email ?? null,
+        avatar,
+        elo: 1200,
+        wins: 0,
+        losses: 0,
+        createdAt: Date.now(),
+      };
+
+      await dynamo.send(new PutCommand({ TableName: TABLE, Item: initialItem }));
+
+      await dynamo.send(
+        new PutCommand({
+          TableName: TABLE,
+          Item: {
+            PK: `USER#${userId}`,
+            SK: "LEADERBOARD",
+            GSI1PK: "LEADERBOARD#GLOBAL",
+            GSI1SK: 1200,
+            userId,
+            username,
+            avatar,
+            wins: 0,
+            losses: 0,
+          },
+        })
+      );
+
+      result = { Item: initialItem };
     }
 
     const item = result.Item;
@@ -26,9 +63,9 @@ export async function GET() {
     const losses = item.losses ?? 0;
 
     return Response.json({
-      userId: (session.user as any).id,
-      username: item.username ?? session.user.name ?? "Coder",
-      avatar: item.avatar ?? session.user.image ?? null,
+      userId,
+      username: item.username ?? session.user?.name ?? "Coder",
+      avatar: item.avatar ?? session.user?.image ?? null,
       elo: item.elo ?? 1200,
       wins,
       losses,

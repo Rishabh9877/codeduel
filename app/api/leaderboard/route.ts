@@ -1,23 +1,17 @@
 import { NextResponse } from "next/server";
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
 
 export const dynamic = "force-dynamic";
 
-const FALLBACK_LEADERBOARD = [
-  { rank: 1, userId: "eng_101", username: "Linus_KernelDev", avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=Linus", elo: 2420, track: "EMBEDDED_SYSTEMS", wins: 88, losses: 12 },
-  { rank: 2, userId: "eng_102", username: "CloudNative_Ace",  avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Cloud", elo: 2315, track: "PRODUCTION_SWE", wins: 76, losses: 14 },
-  { rank: 3, userId: "eng_103", username: "Silicon_Carmack",  avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=John", elo: 2280, track: "EMBEDDED_SYSTEMS", wins: 69, losses: 15 },
-  { rank: 4, userId: "eng_104", username: "Tokio_AsyncMaster", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Tokio", elo: 2190, track: "PRODUCTION_SWE", wins: 54, losses: 18 },
-  { rank: 5, userId: "eng_105", username: "Firmware_Ghost",    avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=Ghost", elo: 2105, track: "EMBEDDED_SYSTEMS", wins: 48, losses: 20 },
-  { rank: 6, userId: "eng_106", username: "K8s_ControllerDev", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=K8s", elo: 1980, track: "PRODUCTION_SWE", wins: 41, losses: 22 },
-  { rank: 7, userId: "eng_107", username: "UART_ProtocolHero", avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=UART", elo: 1890, track: "EMBEDDED_SYSTEMS", wins: 35, losses: 19 },
-  { rank: 8, userId: "guest_1", username: "Guest_Alpha",       avatar: null, elo: 1245, track: "PRODUCTION_SWE", wins: 2, losses: 0 },
-];
-
 export async function GET() {
   try {
-    // Query the GSI — sorted by ELO (GSI1SK) descending
+    const session = await getServerSession(authOptions);
+    const currentUserId = ((session?.user as any)?.id || (session?.user as any)?.sub) as string | undefined;
+
+    // Query GSI1 sorted by ELO descending
     const result = await dynamo.send(
       new QueryCommand({
         TableName: TABLE,
@@ -26,29 +20,48 @@ export async function GET() {
         ExpressionAttributeValues: {
           ":pk": "LEADERBOARD#GLOBAL",
         },
-        ScanIndexForward: false, // descending ELO
+        ScanIndexForward: false, // highest ELO first
         Limit: 50,
       })
     );
 
-    let entries = (result.Items ?? []).map((item, index) => ({
+    const rawItems: any[] = result.Items ?? [];
+
+    // If current logged-in user is not in the list, fetch their profile and merge them in
+    if (currentUserId && !rawItems.some((i) => i.userId === currentUserId)) {
+      const userProf = await dynamo.send(
+        new GetCommand({ TableName: TABLE, Key: { PK: `USER#${currentUserId}`, SK: "PROFILE" } })
+      );
+      if (userProf.Item) {
+        rawItems.push({
+          userId: currentUserId,
+          username: userProf.Item.username ?? session?.user?.name ?? "Developer",
+          avatar: userProf.Item.avatar ?? session?.user?.image ?? null,
+          GSI1SK: Number(userProf.Item.elo ?? 1200),
+          track: "PRODUCTION_SWE",
+          wins: Number(userProf.Item.wins ?? 0),
+          losses: Number(userProf.Item.losses ?? 0),
+        });
+      }
+    }
+
+    // Sort descending by ELO
+    rawItems.sort((a, b) => Number(b.GSI1SK ?? b.elo ?? 0) - Number(a.GSI1SK ?? a.elo ?? 0));
+
+    const entries = rawItems.map((item, index) => ({
       rank: index + 1,
       userId: item.userId,
       username: item.username,
       avatar: item.avatar ?? null,
-      elo: item.GSI1SK, // GSI1SK stores the ELO as a number for sorting
+      elo: Number(item.GSI1SK ?? item.elo ?? 1200),
       track: item.track ?? (index % 2 === 0 ? "EMBEDDED_SYSTEMS" : "PRODUCTION_SWE"),
-      wins: item.wins ?? 0,
-      losses: item.losses ?? 0,
+      wins: Number(item.wins ?? 0),
+      losses: Number(item.losses ?? 0),
     }));
-
-    if (entries.length === 0) {
-      entries = FALLBACK_LEADERBOARD;
-    }
 
     return NextResponse.json({ entries });
   } catch (err) {
-    console.warn("Leaderboard DynamoDB fetch fallback:", err);
-    return NextResponse.json({ entries: FALLBACK_LEADERBOARD });
+    console.error("Leaderboard fetch error:", err);
+    return NextResponse.json({ entries: [] });
   }
 }
