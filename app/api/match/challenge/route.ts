@@ -1,0 +1,143 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { PutCommand, QueryCommand, DeleteCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { dynamo, TABLE } from "@/lib/dynamo";
+import { getChallengeById, getRandomChallenge } from "@/lib/challenges";
+import { v4 as uuidv4 } from "uuid";
+
+// Send a challenge or Accept a challenge
+export async function POST(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const userId = (session.user as any).id as string;
+  const username = session.user.name ?? "anonymous";
+  const avatar = session.user.image ?? null;
+
+  try {
+    const body = await req.json();
+    const { action, targetId, challengeId, track } = body;
+
+    if (!action || !targetId) return NextResponse.json({ error: "Missing data" }, { status: 400 });
+
+    if (action === "send") {
+      // 1. Send a challenge to targetId
+      const now = Date.now();
+      await dynamo.send(
+        new PutCommand({
+          TableName: TABLE,
+          Item: {
+            PK: `CHALLENGE#${targetId}`,
+            SK: `CHALLENGE#${userId}`,
+            challengerId: userId,
+            challengerName: username,
+            challengerAvatar: avatar,
+            createdAt: now,
+            challengeId: challengeId || null,
+            track: track || null,
+            ttl: Math.floor(now / 1000) + 300, // 5 mins
+          },
+        })
+      );
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "accept") {
+      // 2. Accept a challenge from targetId (they are the challenger)
+      const now = Date.now();
+      const challengerId = targetId;
+
+      let deletedChallenge: any;
+      // Delete the challenge (atomic check)
+      try {
+        const delRes = await dynamo.send(
+          new DeleteCommand({
+            TableName: TABLE,
+            Key: { PK: `CHALLENGE#${userId}`, SK: `CHALLENGE#${challengerId}` },
+            ConditionExpression: "attribute_exists(PK)",
+            ReturnValues: "ALL_OLD"
+          })
+        );
+        deletedChallenge = delRes.Attributes;
+      } catch (e) {
+        return NextResponse.json({ error: "Challenge expired or invalid" }, { status: 400 });
+      }
+
+      // Fetch profiles for ELO
+      const challengerProfile = await dynamo.send(
+        new GetCommand({ TableName: TABLE, Key: { PK: `USER#${challengerId}`, SK: "PROFILE" } })
+      );
+      const myProfile = await dynamo.send(
+        new GetCommand({ TableName: TABLE, Key: { PK: `USER#${userId}`, SK: "PROFILE" } })
+      );
+
+      const matchId = uuidv4();
+      
+      // Resolve challenge
+      const requestedChallengeId = deletedChallenge?.challengeId;
+      const requestedTrack = deletedChallenge?.track;
+      let challenge;
+      if (requestedChallengeId) {
+        challenge = getChallengeById(requestedChallengeId) ?? getRandomChallenge(requestedTrack);
+      } else {
+        challenge = getRandomChallenge(requestedTrack);
+      }
+
+      await dynamo.send(
+        new PutCommand({
+          TableName: TABLE,
+          Item: {
+            PK: `MATCH#${matchId}`,
+            SK: "META",
+            matchId,
+            challengeId: challenge.id,
+            track: challenge.track,
+            status: "active",
+            isRanked: false, // Friendly match!
+            startedAt: now,
+            ttl: Math.floor(now / 1000) + 3600, // 1 hour
+            player1: {
+              userId: challengerId,
+              username: challengerProfile.Item?.username ?? "Player 1",
+              avatar: challengerProfile.Item?.avatar ?? null,
+              elo: challengerProfile.Item?.elo ?? 1200,
+              hintsUsed: 0,
+              submitted: false,
+              passed: false,
+              testsPassed: 0,
+            },
+            player2: {
+              userId: userId,
+              username: username,
+              avatar: avatar,
+              elo: myProfile.Item?.elo ?? 1200,
+              hintsUsed: 0,
+              submitted: false,
+              passed: false,
+              testsPassed: 0,
+            },
+          },
+        })
+      );
+
+      return NextResponse.json({ matchId });
+    }
+
+    if (action === "decline") {
+      // 3. Decline a challenge
+      await dynamo.send(
+        new DeleteCommand({
+          TableName: TABLE,
+          Key: { PK: `CHALLENGE#${userId}`, SK: `CHALLENGE#${targetId}` },
+        })
+      );
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+  } catch (err) {
+    console.error("Challenge error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
+}
