@@ -112,7 +112,7 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
     if (!GEMINI_API_KEY) {
       console.error("[hint] GEMINI_API_KEY is not set — using fallback hint");
     } else {
-      const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+      const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 
       const response = await fetch(GEMINI_URL, {
         method: "POST",
