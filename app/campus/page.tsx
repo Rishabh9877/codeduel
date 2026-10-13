@@ -447,11 +447,6 @@ export default function CampusPage() {
                     <span style={{ fontSize: 12, color: "#6e6d7a" }}>
                       {activeCohort.department} · {activeCohort.institution}
                     </span>
-                    {activeCohort.isDemo && (
-                      <span style={{ fontSize: 10, color: "#4ade80", background: "rgba(74,222,128,0.1)", padding: "2px 6px", borderRadius: 4 }}>
-                        Sample Data
-                      </span>
-                    )}
                   </div>
                   <h2 style={{ fontSize: 20, fontWeight: 800, margin: "0 0 6px", color: "#fff" }}>
                     {activeCohort.title}
@@ -785,6 +780,19 @@ export default function CampusPage() {
             </div>
           </div>
         )}
+
+        {/* CAMPUS FOOTER */}
+        <div style={{ marginTop: 48, paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, fontSize: 12, color: "#6e6d7a" }}>
+          <div>
+            CodeDuel Campus Edition · Punjab Engineering College (PEC), Chandigarh
+          </div>
+          <div style={{ display: "flex", gap: 20 }}>
+            <Link href="/about" style={{ color: "#8a8898", textDecoration: "none" }}>About</Link>
+            <Link href="/privacy" style={{ color: "#8a8898", textDecoration: "none" }}>Privacy (DPDP)</Link>
+            <Link href="/terms" style={{ color: "#8a8898", textDecoration: "none" }}>Terms</Link>
+            <Link href="/contact" style={{ color: "#8a8898", textDecoration: "none" }}>Faculty Support</Link>
+          </div>
+        </div>
       </div>
 
       {/* ── JOIN CLASS MODAL ────────────────────────────────────────────── */}

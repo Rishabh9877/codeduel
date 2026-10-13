@@ -641,6 +641,18 @@ export default function LeaderboardPage() {
           )}
         </div>
 
+        {/* LEADERBOARD FOOTER */}
+        <div style={{ marginTop: 64, paddingTop: 28, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, fontSize: 12, color: "#6e6d7a" }}>
+          <div>
+            CodeDuel Global Competitive Engineering Leaderboard · Punjab Engineering College (PEC)
+          </div>
+          <div style={{ display: "flex", gap: 20 }}>
+            <Link href="/about" style={{ color: "#8a8898", textDecoration: "none" }}>About</Link>
+            <Link href="/privacy" style={{ color: "#8a8898", textDecoration: "none" }}>Privacy (DPDP)</Link>
+            <Link href="/terms" style={{ color: "#8a8898", textDecoration: "none" }}>Terms</Link>
+            <Link href="/contact" style={{ color: "#8a8898", textDecoration: "none" }}>Contact</Link>
+          </div>
+        </div>
       </main>
     </>
   );

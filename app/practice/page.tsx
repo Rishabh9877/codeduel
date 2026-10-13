@@ -756,6 +756,19 @@ export default function PracticeCatalogPage() {
             ))}
           </div>
         )}
+
+        {/* PRACTICE FOOTER */}
+        <div style={{ marginTop: 64, paddingTop: 28, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, fontSize: 12, color: "var(--muted2)" }}>
+          <div>
+            CodeDuel Solo Practice Arena · Punjab Engineering College (PEC)
+          </div>
+          <div style={{ display: "flex", gap: 20 }}>
+            <Link href="/about" style={{ color: "var(--muted)", textDecoration: "none" }}>About</Link>
+            <Link href="/privacy" style={{ color: "var(--muted)", textDecoration: "none" }}>Privacy (DPDP)</Link>
+            <Link href="/terms" style={{ color: "var(--muted)", textDecoration: "none" }}>Terms</Link>
+            <Link href="/contact" style={{ color: "var(--muted)", textDecoration: "none" }}>Contact</Link>
+          </div>
+        </div>
       </main>
     </div>
   );

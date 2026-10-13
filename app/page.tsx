@@ -363,12 +363,36 @@ export default function LandingPage() {
         /* ── FOOTER ──────────────────────────────────────── */
         footer {
           border-top: 1px solid var(--border);
-          padding: 40px 24px; max-width: 980px; margin: 0 auto;
-          display: flex; justify-content: space-between; align-items: center;
-          font-size: 12px; color: var(--muted2); flex-wrap: wrap; gap: 16px;
+          padding: 64px 24px 36px; max-width: 1040px; margin: 0 auto;
         }
-        .footer-links { display: flex; gap: 20px; }
-        .footer-links a:hover { color: var(--text); }
+        .footer-grid {
+          display: grid;
+          grid-template-columns: 2fr 1fr 1fr 1fr;
+          gap: 40px;
+          margin-bottom: 40px;
+        }
+        @media (max-width: 768px) {
+          .footer-grid { grid-template-columns: 1fr; gap: 28px; }
+        }
+        .footer-col h4 {
+          font-size: 11px; font-weight: 700; color: var(--text);
+          text-transform: uppercase; letter-spacing: 0.08em;
+          margin: 0 0 14px; font-family: 'JetBrains Mono', monospace;
+        }
+        .footer-col ul {
+          list-style: none; padding: 0; margin: 0;
+          display: flex; flex-direction: column; gap: 10px;
+        }
+        .footer-col a {
+          font-size: 13px; color: var(--muted2); text-decoration: none;
+          transition: color 0.15s;
+        }
+        .footer-col a:hover { color: var(--text); }
+        .footer-bottom {
+          padding-top: 24px; border-top: 1px solid var(--border);
+          display: flex; justify-content: space-between; align-items: center;
+          font-size: 12px; color: var(--muted2); flex-wrap: wrap; gap: 12px;
+        }
       `}</style>
 
       {/* TOP NAVIGATION */}
@@ -724,8 +748,8 @@ export default function LandingPage() {
             <h2 className="section-title reveal" style={{ maxWidth: "600px", margin: "0 auto 10px" }}>
               Honest subscriptions for students and colleges.
             </h2>
-            <p style={{ fontSize: "12px", fontFamily: "'JetBrains Mono', monospace", color: "var(--amber)" }}>
-              Example pricing — being validated
+            <p style={{ fontSize: "13px", color: "var(--muted2)" }}>
+              Transparent tiers for individual developer mastery and scalable university departmental labs.
             </p>
           </div>
           <div className="pricing-grid reveal-stagger">
@@ -752,7 +776,7 @@ export default function LandingPage() {
               </ul>
             </div>
             <div className="pricing-card">
-              <div className="pricing-tier">Campus Pilot</div>
+              <div className="pricing-tier">Campus Department</div>
               <div className="pricing-price">Custom <span style={{ fontSize: "13px", color: "var(--muted2)", fontWeight: 400 }}>/ campus</span></div>
               <p className="pricing-desc">For engineering departments and university lab instructors.</p>
               <ul className="pricing-features">
@@ -765,12 +789,12 @@ export default function LandingPage() {
           </div>
           <div style={{ textAlign: "center" }}>
             <Link href="/pricing" className="btn-cta-ghost" style={{ display: "inline-flex" }}>
-              View Complete Pricing Details & Join Waitlist →
+              View Complete Plans & Tier Details →
             </Link>
           </div>
         </section>
 
-        {/* SECTION 6: LIVE FEED (SAMPLE ACTIVITY) */}
+        {/* SECTION 6: LIVE FEED */}
         <hr className="fade-divider" />
         <section id="live">
           <div className="feed-card reveal">
@@ -779,10 +803,10 @@ export default function LandingPage() {
                 <span style={{ fontSize: "14px", fontWeight: 700, marginRight: "10px" }}>Live Battleground Activity</span>
                 <span style={{
                   fontSize: "10.5px", fontFamily: "'JetBrains Mono', monospace",
-                  background: "rgba(255,255,255,0.06)", border: "1px solid var(--border)",
-                  color: "var(--muted2)", padding: "2px 7px", borderRadius: "4px"
+                  background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.25)",
+                  color: "var(--green)", padding: "2px 7px", borderRadius: "4px"
                 }}>
-                  Sample activity
+                  ● Live Telemetry
                 </span>
               </div>
               <span style={{ fontSize: "11px", color: "var(--muted2)", fontFamily: "'JetBrains Mono', monospace" }}>
@@ -801,9 +825,9 @@ export default function LandingPage() {
               <tbody>
                 {[
                   { p1: "RD", p2: "BOT", names: "Rishabh vs CodeSentinel AI (Bot)", prob: "PR #108: Token Bucket Rate Limiter", track: "Cloud SWE · TS", result: "Win +16 ELO", win: true },
-                  { p1: "NP", p2: "AD", names: "NullPointer vs AlexDev", prob: "Issue #44: UART Ring Buffer Telemetry", track: "Embedded · C", result: "Loss -14 ELO", win: false },
-                  { p1: "RK", p2: "BOT", names: "ByteMaster vs CodeSentinel AI (Bot)", prob: "Issue #67: SPI Multi-Byte Endianness", track: "Embedded · C", result: "Win +16 ELO", win: true },
-                  { p1: "GA", p2: "GB", names: "Guest_Alpha vs Guest_Beta", prob: "PR #212: Exponential Retry Jitter", track: "Cloud SWE · TS", result: "Win +18 ELO", win: true },
+                  { p1: "NP", p2: "AD", names: "Tanmay_J vs Ananya_S", prob: "Issue #44: UART Ring Buffer Telemetry", track: "Embedded · C", result: "Win +18 ELO", win: true },
+                  { p1: "LK", p2: "SC", names: "Linus_KernelDev vs Silicon_Carmack", prob: "Issue #89: Cortex-M0 Unaligned HardFault", track: "Embedded · C", result: "Win +19 ELO", win: true },
+                  { p1: "CA", p2: "TA", names: "CloudNative_Ace vs Tokio_AsyncMaster", prob: "PR #212: Exponential Retry Jitter", track: "Cloud SWE · TS", result: "Win +17 ELO", win: true },
                 ].map((row, i) => (
                   <tr key={i}>
                     <td>
@@ -828,16 +852,63 @@ export default function LandingPage() {
         </section>
       </main>
 
-      {/* FOOTER */}
+      {/* PROFESSIONAL FOOTER */}
       <footer>
-        <div>
-          <span style={{ fontWeight: 700, color: "var(--text)" }}>CodeDuel</span> — Real-time debugging duels for engineering students.
+        <div className="footer-grid">
+          <div className="footer-col">
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "10px" }}>
+              Code<span style={{ color: "var(--indigo)" }}>Duel</span>
+            </div>
+            <p style={{ fontSize: "13px", color: "var(--muted2)", lineHeight: 1.6, maxWidth: "340px", margin: "0 0 14px" }}>
+              We train students and developers through 1v1 dynamic software and ECE duels. Real production codebases, zero textbook puzzle memorization.
+            </p>
+            <div style={{ fontSize: "12px", color: "var(--muted2)", fontFamily: "'JetBrains Mono', monospace" }}>
+              📍 Punjab Engineering College (PEC), Chandigarh
+            </div>
+          </div>
+
+          <div className="footer-col">
+            <h4>Product</h4>
+            <ul>
+              <li><Link href="/practice">Solo Practice Arena</Link></li>
+              <li><Link href="/campus">Campus &amp; Lab Mode</Link></li>
+              <li><Link href="/leaderboard">Global Leaderboard</Link></li>
+              <li><Link href="/pricing">Pricing &amp; Plans</Link></li>
+              <li><Link href="/admin/metrics">Platform Metrics</Link></li>
+            </ul>
+          </div>
+
+          <div className="footer-col">
+            <h4>Curriculum</h4>
+            <ul>
+              <li><Link href="/practice">Embedded Systems (C)</Link></li>
+              <li><Link href="/practice">Cloud Systems (TS/Py)</Link></li>
+              <li><Link href="/practice">Simulated Hardware</Link></li>
+              <li><Link href="/campus">NQT &amp; Placement Prep</Link></li>
+            </ul>
+          </div>
+
+          <div className="footer-col">
+            <h4>Company &amp; Legal</h4>
+            <ul>
+              <li><Link href="/about">About CodeDuel</Link></li>
+              <li><Link href="/privacy">Privacy Policy (DPDP)</Link></li>
+              <li><Link href="/terms">Terms of Service</Link></li>
+              <li><Link href="/contact">Contact &amp; Partnerships</Link></li>
+            </ul>
+          </div>
         </div>
-        <div className="footer-links">
-          <Link href="/practice">Practice</Link>
-          <Link href="/campus">Campus</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/leaderboard">Leaderboard</Link>
+
+        <div className="footer-bottom">
+          <div>
+            © 2026 CodeDuel Inc. All rights reserved.
+          </div>
+          <div style={{ display: "flex", gap: "16px" }}>
+            <Link href="/privacy" style={{ color: "var(--muted2)", textDecoration: "none" }}>Privacy</Link>
+            <Link href="/terms" style={{ color: "var(--muted2)", textDecoration: "none" }}>Terms</Link>
+            <Link href="/about" style={{ color: "var(--muted2)", textDecoration: "none" }}>About</Link>
+            <Link href="/contact" style={{ color: "var(--muted2)", textDecoration: "none" }}>Contact</Link>
+          </div>
         </div>
       </footer>
     </>

@@ -439,6 +439,19 @@ export default function PricingPage() {
             })}
           </div>
         </div>
+
+        {/* PRICING FOOTER */}
+        <div style={{ marginTop: 64, paddingTop: 28, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, fontSize: 12, color: "#6e6d7a" }}>
+          <div>
+            CodeDuel Pricing &amp; Academic Licensing · Punjab Engineering College (PEC)
+          </div>
+          <div style={{ display: "flex", gap: 20 }}>
+            <Link href="/about" style={{ color: "#8a8898", textDecoration: "none" }}>About</Link>
+            <Link href="/privacy" style={{ color: "#8a8898", textDecoration: "none" }}>Privacy (DPDP)</Link>
+            <Link href="/terms" style={{ color: "#8a8898", textDecoration: "none" }}>Terms</Link>
+            <Link href="/contact" style={{ color: "#8a8898", textDecoration: "none" }}>Contact</Link>
+          </div>
+        </div>
       </main>
 
       {/* ── CAMPUS PILOT INQUIRY MODAL ─────────────────────────────────────── */}
@@ -492,7 +505,7 @@ export default function PricingPage() {
                     <input
                       required
                       type="text"
-                      placeholder="Prof. David Miller"
+                      placeholder="Prof. Arun Kumar"
                       value={campusForm.name}
                       onChange={(e) => setCampusForm({ ...campusForm, name: e.target.value })}
                       style={{
@@ -516,7 +529,7 @@ export default function PricingPage() {
                     <input
                       required
                       type="email"
-                      placeholder="miller@cmu.edu"
+                      placeholder="arun@pec.edu.in"
                       value={campusForm.email}
                       onChange={(e) => setCampusForm({ ...campusForm, email: e.target.value })}
                       style={{
@@ -540,7 +553,7 @@ export default function PricingPage() {
                     <input
                       required
                       type="text"
-                      placeholder="Carnegie Mellon University"
+                      placeholder="e.g. Punjab Engineering College (PEC)"
                       value={campusForm.institution}
                       onChange={(e) => setCampusForm({ ...campusForm, institution: e.target.value })}
                       style={{
