@@ -244,8 +244,11 @@ function matchesFilter(
 async function executeUniversalCommand(command: any): Promise<any> {
   const input = command.input ?? {};
 
-  // 1. GetCommand
-  if (command.constructor?.name === "GetCommand" || input.Key) {
+  // 1. GetCommand (only when NOT Update or Delete)
+  if (
+    command.constructor?.name === "GetCommand" ||
+    (input.Key && !input.UpdateExpression && command.constructor?.name !== "UpdateCommand" && command.constructor?.name !== "DeleteCommand")
+  ) {
     const pk = input.Key?.PK;
     const sk = input.Key?.SK;
     if (pk && sk) {
@@ -407,7 +410,14 @@ async function executeUniversalCommand(command: any): Promise<any> {
         const sk = step.Update.Key?.SK;
         if (pk && sk) {
           const keyStr = `${pk}###${sk}`;
-          let item = memoryStore.get(keyStr) ?? { PK: pk, SK: sk };
+          let item = memoryStore.get(keyStr);
+          if (!item && pgSql) {
+            try {
+              const rows = await pgSql`SELECT item FROM codeduel_store WHERE pk = ${pk} AND sk = ${sk} LIMIT 1`;
+              if (rows.length > 0) item = rows[0].item;
+            } catch (e) {}
+          }
+          if (!item) item = { PK: pk, SK: sk };
           applyUpdateExpression(
             item,
             step.Update.UpdateExpression,

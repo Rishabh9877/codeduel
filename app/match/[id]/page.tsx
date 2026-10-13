@@ -321,6 +321,7 @@ export default function MatchArena() {
         setMatchOver(true);
         setWon(data.won);
         stopPolling();
+        fetchMatch();
       } else {
         // Refetch match to update testsPassed score
         fetchMatch();
@@ -1051,31 +1052,40 @@ export default function MatchArena() {
             </p>
 
             {/* ELO Result */}
-            {finalMatchPayload && (
-              <div style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: 8,
-                padding: "14px 20px",
-                marginBottom: 24,
-                display: "flex",
-                justifyContent: "space-around"
-              }}>
-                <div>
-                  <div style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase" }}>Your Rating</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: won ? "#4ade80" : "#f87171" }}>
-                    {won ? "+16 ELO" : "-16 ELO"}
+            {(() => {
+              const startElo = match?.[myRole]?.elo ?? 1200;
+              const myNewElo = won
+                ? (finalMatchPayload?.newWinnerElo ?? (startElo + 16))
+                : (finalMatchPayload?.newLoserElo ?? Math.max(100, startElo - 16));
+              const myEloDelta = myNewElo - startElo;
+              const formattedDelta = myEloDelta >= 0 ? `+${myEloDelta}` : `${myEloDelta}`;
+
+              return (
+                <div style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 8,
+                  padding: "14px 20px",
+                  marginBottom: 24,
+                  display: "flex",
+                  justifyContent: "space-around"
+                }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase" }}>Your Rating</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: won ? "#4ade80" : "#f87171" }}>
+                      {formattedDelta} ELO <span style={{ fontSize: 13, opacity: 0.85, color: "#fff" }}>({myNewElo})</span>
+                    </div>
+                  </div>
+                  <div style={{ width: 1, background: "rgba(255,255,255,0.08)" }} />
+                  <div>
+                    <div style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase" }}>Challenge</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginTop: 4 }}>
+                      {challenge.track === "PRODUCTION_SWE" ? "Cloud SWE" : "Embedded"}
+                    </div>
                   </div>
                 </div>
-                <div style={{ width: 1, background: "rgba(255,255,255,0.08)" }} />
-                <div>
-                  <div style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase" }}>Challenge</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginTop: 4 }}>
-                    {challenge.track === "PRODUCTION_SWE" ? "Cloud SWE" : "Embedded"}
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             <div style={{ display: "flex", gap: 12 }}>
               <Link

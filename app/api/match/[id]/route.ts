@@ -6,6 +6,8 @@ import { dynamo, TABLE } from "@/lib/dynamo";
 import { getChallengeById } from "@/lib/challenges";
 import { calcElo } from "@/lib/elo";
 
+export const dynamic = "force-dynamic";
+
 const MATCH_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 export async function GET(
@@ -85,6 +87,9 @@ export async function GET(
       // If 40 seconds elapsed, bot solves everything and wins
       if (elapsedMs >= 40000 && match.status === "active") {
         const botId = match[botRole].userId;
+        const humanRole = botRole === "player1" ? "player2" : "player1";
+        const humanId = match[humanRole].userId;
+
         match.status = "finished";
         match.winnerId = botId;
         match.finishedAt = now;
@@ -92,23 +97,86 @@ export async function GET(
         match[botRole].passed = true;
         match[botRole].testsPassed = totalTests;
 
-        await dynamo.send(new UpdateCommand({
+        // Fetch live human profile for accurate ELO calculation
+        const humanProfileRes = await dynamo.send(new GetCommand({
           TableName: TABLE,
-          Key: { PK: `MATCH#${matchId}`, SK: "META" },
-          UpdateExpression: "SET #s = :fin, winnerId = :wid, finishedAt = :now, endedBy = :eb, " +
-                            `${botRole}.passed = :t, ${botRole}.testsPassed = :tt`,
-          ConditionExpression: "#s = :act",
-          ExpressionAttributeNames: { "#s": "status" },
-          ExpressionAttributeValues: {
-            ":fin": "finished",
-            ":wid": botId,
-            ":now": now,
-            ":eb": "bot_solve",
-            ":t": true,
-            ":tt": totalTests,
-            ":act": "active",
-          }
-        })).catch(() => {});
+          Key: { PK: `USER#${humanId}`, SK: "PROFILE" }
+        })).catch(() => ({ Item: null }));
+
+        const liveHumanElo = Number(humanProfileRes.Item?.elo ?? match[humanRole].elo ?? 1200);
+        const liveBotElo = Number(match[botRole].elo ?? 1200);
+
+        const newBotElo = calcElo(liveBotElo, liveHumanElo, true);
+        const newHumanElo = calcElo(liveHumanElo, liveBotElo, false);
+
+        const humanWins = Number(humanProfileRes.Item?.wins ?? 0);
+        const humanLosses = (Number(humanProfileRes.Item?.losses) || 0) + 1;
+
+        match.newWinnerElo = newBotElo;
+        match.newLoserElo = newHumanElo;
+        match[humanRole].elo = newHumanElo;
+        match[botRole].elo = newBotElo;
+
+        await dynamo.send(new TransactWriteCommand({
+          TransactItems: [
+            {
+              Update: {
+                TableName: TABLE,
+                Key: { PK: `MATCH#${matchId}`, SK: "META" },
+                UpdateExpression: "SET #s = :fin, winnerId = :wid, finishedAt = :now, endedBy = :eb, " +
+                                  `${botRole}.passed = :t, ${botRole}.testsPassed = :tt, newWinnerElo = :nwe, newLoserElo = :nle`,
+                ConditionExpression: "#s = :act",
+                ExpressionAttributeNames: { "#s": "status" },
+                ExpressionAttributeValues: {
+                  ":fin": "finished",
+                  ":wid": botId,
+                  ":now": now,
+                  ":eb": "bot_solve",
+                  ":t": true,
+                  ":tt": totalTests,
+                  ":act": "active",
+                  ":nwe": newBotElo,
+                  ":nle": newHumanElo,
+                }
+              }
+            },
+            {
+              Put: {
+                TableName: TABLE,
+                Item: {
+                  PK: `USER#${humanId}`,
+                  SK: "PROFILE",
+                  userId: humanId,
+                  username: humanProfileRes.Item?.username ?? match[humanRole].username ?? "Developer",
+                  email: humanProfileRes.Item?.email ?? null,
+                  avatar: humanProfileRes.Item?.avatar ?? match[humanRole].avatar ?? null,
+                  elo: newHumanElo,
+                  wins: humanWins,
+                  losses: humanLosses,
+                  createdAt: humanProfileRes.Item?.createdAt ?? now,
+                }
+              }
+            },
+            {
+              Put: {
+                TableName: TABLE,
+                Item: {
+                  PK: `USER#${humanId}`,
+                  SK: "LEADERBOARD",
+                  GSI1PK: "LEADERBOARD#GLOBAL",
+                  GSI1SK: newHumanElo,
+                  userId: humanId,
+                  username: humanProfileRes.Item?.username ?? match[humanRole].username ?? "Developer",
+                  avatar: humanProfileRes.Item?.avatar ?? match[humanRole].avatar ?? null,
+                  wins: humanWins,
+                  losses: humanLosses,
+                }
+              }
+            }
+          ]
+        })).catch((err) => {
+          console.error("[Bot Solve Commit Error]:", err);
+        });
       }
     }
 
@@ -234,5 +302,7 @@ export async function GET(
       totalTests: challenge.totalTests,
     },
     myRole,
+  }, {
+    headers: { "Cache-Control": "no-store, max-age=0" }
   });
 }

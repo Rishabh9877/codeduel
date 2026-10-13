@@ -3,6 +3,8 @@ import { authOptions } from "@/lib/auth";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   const userId = ((session?.user as any)?.id || (session?.user as any)?.sub) as string | undefined;
@@ -71,6 +73,8 @@ export async function GET() {
       losses,
       totalMatches: wins + losses,
       winRate: wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : 0,
+    }, {
+      headers: { "Cache-Control": "no-store, max-age=0" }
     });
   } catch (err) {
     console.error("User fetch error:", err);
