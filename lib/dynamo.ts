@@ -2,19 +2,16 @@
 // UNIVERSAL DATABASE ADAPTER FOR CODEDUEL (AWS DYNAMODB / NEON POSTGRES / LOCAL)
 // =============================================================================
 //
-// This module provides zero-configuration persistence:
 // 1. If real AWS credentials exist -> routes directly to AWS DynamoDB.
 // 2. If DATABASE_URL (Neon / Supabase Postgres) exists -> persists to PostgreSQL.
-// 3. Otherwise -> persists to a local JSON database file (100% free, zero accounts).
-//
-// This guarantees that authentication, matchmaking, profiles, and leaderboards
-// work instantly without requiring an AWS account or credit card.
+// 3. Otherwise -> persists to in-memory/local JSON disk (100% free, zero accounts).
 // =============================================================================
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import fs from "fs";
 import path from "path";
+import postgres from "postgres";
 
 export const TABLE = "CodeDuelTable";
 
@@ -44,13 +41,24 @@ if (hasRealAwsCredentials()) {
   }
 }
 
+// ── Neon Serverless PostgreSQL Client ─────────────────────────────────────────
+let pgSql: any = null;
+if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgres")) {
+  try {
+    pgSql = postgres(process.env.DATABASE_URL, {
+      ssl: "require",
+      max: 10,
+      idle_timeout: 20,
+    });
+  } catch (err) {
+    console.warn("[dynamo.ts] Could not initialize Postgres client:", err);
+  }
+}
+
 // ── Local / In-Memory Persistent Store ─────────────────────────────────────────
 const DB_FILE_PATH = path.join(process.cwd(), ".next", "codeduel_db.json");
-
-// In-memory cache mapping: `${PK}###${SK}` -> Item
 const memoryStore = new Map<string, any>();
 
-// Seed default initial leaderboard and bot data
 function initDefaultData() {
   const seedUsers = [
     { userId: "eng_101", username: "Linus_KernelDev", avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=Linus", elo: 2420, wins: 88, losses: 12, track: "EMBEDDED_SYSTEMS" },
@@ -93,7 +101,6 @@ function initDefaultData() {
   }
 }
 
-// Load from disk if exists
 try {
   if (fs.existsSync(DB_FILE_PATH)) {
     const raw = fs.readFileSync(DB_FILE_PATH, "utf-8");
@@ -117,9 +124,7 @@ function persistToDisk() {
       obj[k] = v;
     }
     fs.writeFileSync(DB_FILE_PATH, JSON.stringify(obj, null, 2), "utf-8");
-  } catch (err) {
-    // Ignore in read-only environments like Vercel serverless
-  }
+  } catch (err) {}
 }
 
 // ── Expression Parsing Helpers ─────────────────────────────────────────────────
@@ -154,13 +159,11 @@ function applyUpdateExpression(
 ) {
   if (!expression) return;
 
-  // Substitute attribute names (e.g. #s -> status)
   let expr = expression;
   for (const [placeholder, realName] of Object.entries(names)) {
     expr = expr.replace(new RegExp(placeholder + "\\b", "g"), realName);
   }
 
-  // Handle SET clauses
   const setMatch = expr.match(/SET\s+([\s\S]+?)(?=\s+ADD|\s*$)/i);
   if (setMatch) {
     const rawAssignments = setMatch[1].split(",");
@@ -175,7 +178,6 @@ function applyUpdateExpression(
     }
   }
 
-  // Handle ADD clauses (e.g. ADD wins :one or ADD losses :one)
   const addMatch = expr.match(/ADD\s+([\s\S]+?)(?=\s+SET|\s*$)/i);
   if (addMatch) {
     const rawAdds = addMatch[1].split(",");
@@ -200,41 +202,35 @@ function matchesFilter(
 ): boolean {
   if (!filterExpr) return true;
 
-  // Substitute attribute names
   let expr = filterExpr;
   for (const [placeholder, realName] of Object.entries(names)) {
     expr = expr.replace(new RegExp(placeholder + "\\b", "g"), realName);
   }
 
-  // Common pattern 1: begins_with(PK, :prefix) AND SK = :sk AND userId <> :me
   const beginsMatch = expr.match(/begins_with\(PK,\s*(:[a-zA-Z0-9_]+)\)/);
   if (beginsMatch) {
     const prefix = values[beginsMatch[1]];
     if (typeof prefix === "string" && !item.PK?.startsWith(prefix)) return false;
   }
 
-  // Common pattern 2: SK = :sk
   const skMatch = expr.match(/\bSK\s*=\s*(:[a-zA-Z0-9_]+)/);
   if (skMatch) {
     const expected = values[skMatch[1]];
     if (item.SK !== expected) return false;
   }
 
-  // Common pattern 3: status = :active or #s = :active
   const statusMatch = expr.match(/\bstatus\s*=\s*(:[a-zA-Z0-9_]+)/);
   if (statusMatch) {
     const expected = values[statusMatch[1]];
     if (item.status !== expected) return false;
   }
 
-  // Common pattern 4: userId <> :me
   const notMeMatch = expr.match(/\buserId\s*<>\s*(:[a-zA-Z0-9_]+)/);
   if (notMeMatch) {
     const notId = values[notMeMatch[1]];
     if (item.userId === notId) return false;
   }
 
-  // Common pattern 5: player1.userId = :uid OR player2.userId = :uid
   const playerMatch = expr.match(/\(player1\.userId\s*=\s*(:[a-zA-Z0-9_]+)\s*OR\s*player2\.userId\s*=\s*:[a-zA-Z0-9_]+\)/);
   if (playerMatch) {
     const uid = values[playerMatch[1]];
@@ -253,6 +249,13 @@ async function executeUniversalCommand(command: any): Promise<any> {
     const pk = input.Key?.PK;
     const sk = input.Key?.SK;
     if (pk && sk) {
+      if (pgSql) {
+        try {
+          const rows = await pgSql`SELECT item FROM codeduel_store WHERE pk = ${pk} AND sk = ${sk}`;
+          if (rows.length > 0) return { Item: rows[0].item };
+          return { Item: undefined };
+        } catch (e) {}
+      }
       const item = memoryStore.get(`${pk}###${sk}`);
       return { Item: item ? JSON.parse(JSON.stringify(item)) : undefined };
     }
@@ -264,6 +267,16 @@ async function executeUniversalCommand(command: any): Promise<any> {
     if (item?.PK && item?.SK) {
       memoryStore.set(`${item.PK}###${item.SK}`, JSON.parse(JSON.stringify(item)));
       persistToDisk();
+
+      if (pgSql) {
+        try {
+          await pgSql`
+            INSERT INTO codeduel_store (pk, sk, gsi1pk, gsi1sk, item)
+            VALUES (${item.PK}, ${item.SK}, ${item.GSI1PK ?? null}, ${item.GSI1SK ?? null}, ${item})
+            ON CONFLICT (pk, sk) DO UPDATE SET item = EXCLUDED.item, gsi1pk = EXCLUDED.gsi1pk, gsi1sk = EXCLUDED.gsi1sk, updated_at = NOW()
+          `;
+        } catch (e) {}
+      }
       return {};
     }
   }
@@ -275,6 +288,11 @@ async function executeUniversalCommand(command: any): Promise<any> {
     if (pk && sk) {
       memoryStore.delete(`${pk}###${sk}`);
       persistToDisk();
+      if (pgSql) {
+        try {
+          await pgSql`DELETE FROM codeduel_store WHERE pk = ${pk} AND sk = ${sk}`;
+        } catch (e) {}
+      }
       return {};
     }
   }
@@ -286,6 +304,12 @@ async function executeUniversalCommand(command: any): Promise<any> {
     if (pk && sk) {
       const keyStr = `${pk}###${sk}`;
       let item = memoryStore.get(keyStr);
+      if (!item && pgSql) {
+        try {
+          const rows = await pgSql`SELECT item FROM codeduel_store WHERE pk = ${pk} AND sk = ${sk}`;
+          if (rows.length > 0) item = rows[0].item;
+        } catch (e) {}
+      }
       if (!item) {
         item = { PK: pk, SK: sk };
       }
@@ -297,6 +321,16 @@ async function executeUniversalCommand(command: any): Promise<any> {
       );
       memoryStore.set(keyStr, item);
       persistToDisk();
+
+      if (pgSql) {
+        try {
+          await pgSql`
+            INSERT INTO codeduel_store (pk, sk, gsi1pk, gsi1sk, item)
+            VALUES (${pk}, ${sk}, ${item.GSI1PK ?? null}, ${item.GSI1SK ?? null}, ${item})
+            ON CONFLICT (pk, sk) DO UPDATE SET item = EXCLUDED.item, gsi1pk = EXCLUDED.gsi1pk, gsi1sk = EXCLUDED.gsi1sk, updated_at = NOW()
+          `;
+        } catch (e) {}
+      }
       return { Attributes: item };
     }
   }
@@ -304,25 +338,47 @@ async function executeUniversalCommand(command: any): Promise<any> {
   // 5. QueryCommand (GSI1 Leaderboard query)
   if (command.constructor?.name === "QueryCommand") {
     const targetPk = input.ExpressionAttributeValues?.[":pk"] ?? "LEADERBOARD#GLOBAL";
-    const items: any[] = [];
+    const limit = input.Limit ?? 50;
 
+    if (pgSql) {
+      try {
+        const rows = await pgSql`
+          SELECT item FROM codeduel_store
+          WHERE gsi1pk = ${targetPk}
+          ORDER BY gsi1sk DESC
+          LIMIT ${limit}
+        `;
+        if (rows.length > 0) {
+          return { Items: rows.map((r: any) => r.item), Count: rows.length };
+        }
+      } catch (e) {}
+    }
+
+    const items: any[] = [];
     for (const item of memoryStore.values()) {
       if (item.GSI1PK === targetPk) {
         items.push(JSON.parse(JSON.stringify(item)));
       }
     }
-
-    // Sort descending by ELO (GSI1SK)
     items.sort((a, b) => Number(b.GSI1SK ?? 0) - Number(a.GSI1SK ?? 0));
-
-    const limit = input.Limit ?? 50;
     return { Items: items.slice(0, limit), Count: items.length };
   }
 
   // 6. ScanCommand
   if (command.constructor?.name === "ScanCommand") {
+    let allItems: any[] = [];
+    if (pgSql) {
+      try {
+        const rows = await pgSql`SELECT item FROM codeduel_store`;
+        allItems = rows.map((r: any) => r.item);
+      } catch (e) {}
+    }
+    if (allItems.length === 0) {
+      allItems = Array.from(memoryStore.values());
+    }
+
     const matched: any[] = [];
-    for (const item of memoryStore.values()) {
+    for (const item of allItems) {
       if (matchesFilter(item, input.FilterExpression, input.ExpressionAttributeNames, input.ExpressionAttributeValues)) {
         matched.push(JSON.parse(JSON.stringify(item)));
       }
@@ -337,6 +393,15 @@ async function executeUniversalCommand(command: any): Promise<any> {
       if (step.Put) {
         const item = step.Put.Item;
         memoryStore.set(`${item.PK}###${item.SK}`, JSON.parse(JSON.stringify(item)));
+        if (pgSql) {
+          try {
+            await pgSql`
+              INSERT INTO codeduel_store (pk, sk, gsi1pk, gsi1sk, item)
+              VALUES (${item.PK}, ${item.SK}, ${item.GSI1PK ?? null}, ${item.GSI1SK ?? null}, ${item})
+              ON CONFLICT (pk, sk) DO UPDATE SET item = EXCLUDED.item, gsi1pk = EXCLUDED.gsi1pk, gsi1sk = EXCLUDED.gsi1sk, updated_at = NOW()
+            `;
+          } catch (e) {}
+        }
       } else if (step.Update) {
         const pk = step.Update.Key?.PK;
         const sk = step.Update.Key?.SK;
@@ -350,12 +415,26 @@ async function executeUniversalCommand(command: any): Promise<any> {
             step.Update.ExpressionAttributeValues
           );
           memoryStore.set(keyStr, item);
+          if (pgSql) {
+            try {
+              await pgSql`
+                INSERT INTO codeduel_store (pk, sk, gsi1pk, gsi1sk, item)
+                VALUES (${pk}, ${sk}, ${item.GSI1PK ?? null}, ${item.GSI1SK ?? null}, ${item})
+                ON CONFLICT (pk, sk) DO UPDATE SET item = EXCLUDED.item, gsi1pk = EXCLUDED.gsi1pk, gsi1sk = EXCLUDED.gsi1sk, updated_at = NOW()
+              `;
+            } catch (e) {}
+          }
         }
       } else if (step.Delete) {
         const pk = step.Delete.Key?.PK;
         const sk = step.Delete.Key?.SK;
         if (pk && sk) {
           memoryStore.delete(`${pk}###${sk}`);
+          if (pgSql) {
+            try {
+              await pgSql`DELETE FROM codeduel_store WHERE pk = ${pk} AND sk = ${sk}`;
+            } catch (e) {}
+          }
         }
       }
     }
