@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:elo": "npx tsx scripts/test-elo.ts",
+    "test:solutions": "npx tsx scripts/test-solutions.ts",
+    "seed:demo": "npx tsx scripts/seed-demo.ts",
     "wipe-db": "npx tsx scripts/wipe-db.ts",
     "sync-users": "npx tsx scripts/sync-users.ts"
   },

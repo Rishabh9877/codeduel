@@ -7,6 +7,7 @@ import {
 import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { getChallengeById, getRandomChallenge } from "@/lib/challenges";
+import { checkUserDuelQuota } from "@/lib/subscription";
 import { v4 as uuidv4 } from "uuid";
 
 const MATCH_DURATION_MS = 15 * 60 * 1000;
@@ -37,6 +38,22 @@ export async function POST(req: Request) {
   const url = new URL(req.url);
   if (url.searchParams.get("demo") === "true") {
     forceDemo = true;
+  }
+
+  // 1.5 — Daily Duel Quota Check for Free Tier
+  if (!forceDemo) {
+    const quota = await checkUserDuelQuota(userId);
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: "Daily free duel limit reached (5/5 duels today). Upgrade to Pro for unlimited competitive duels.",
+          quotaExceeded: true,
+          duelsToday: quota.duelsToday,
+          maxDaily: quota.maxDaily,
+        },
+        { status: 429 }
+      );
+    }
   }
 
   // 2 — Get current ELO

@@ -1,86 +1,195 @@
-# CodeDuel — Real-Time 1v1 Engineering Battleground
+# CodeDuel — 1v1 Dynamic Software & ECE Engineering Duels
 
-CodeDuel is a real-time competitive engineering platform where developers race 1v1 to triage and resolve real-world production tickets across multi-file codebases. 
+> *"We train students and developers through 1v1 dynamic software and ECE duels."*
 
-We have completely eliminated textbook DSA puzzles (e.g., Two Sum, Tree Inversions). Instead, CodeDuel simulates authentic engineering challenges across two distinct competitive tracks:
+[![Next.js 16](https://img.shields.io/badge/Next.js-16.2.9-black?logo=next.js)](https://nextjs.org/)
+[![React 19](https://img.shields.io/badge/React-19.2.4-blue?logo=react)](https://react.dev/)
+[![TypeScript 5](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%2F%20DynamoDB-336791?logo=postgresql)](https://neon.tech/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-1. **Track `PRODUCTION_SWE` (Open Source & Cloud Microservices):**
-   - Multi-file TypeScript & Node.js architectures.
-   - Developers inspect bug reports (race conditions, token bucket drift, leaky state), navigate modular codebases, patch the bug in an editable file, and satisfy automated unit test suites.
-2. **Track `EMBEDDED_SYSTEMS` (Firmware & Core Electronics):**
-   - Multi-file C/C++ embedded codebases.
-   - Developers inspect hardware driver alerts (UART ring buffer wrap-around, register mask corruptions, volatile synchronization), fix memory and pointer operations, and satisfy bare-metal assertion test runners.
+**CodeDuel** is a competitive engineering platform that bridges the massive gap between textbook algorithm memorization (LeetCode/DSA) and real-world production engineering. 
+
+Instead of inverting binary trees, engineers race head-to-head in real time to diagnose, trace, and patch authentic bugs across production multi-file codebases in **Cloud Systems (TypeScript / Python)** and **Embedded Firmware (C / Bare-Metal Hardware)**.
 
 ---
 
-## Tech Stack & Architecture
+## ⚡ The CodeDuel Advantage
 
-- **Frontend & API** — Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS
-- **Code Editor** — Monaco Editor (`@monaco-editor/react`) with tabbed workspace, `Record<string, string>` state preservation, and dynamic read-only file enforcement.
-- **Database** — AWS DynamoDB (Single-Table Design with GSI for leaderboards).
-- **Code Execution** — [Piston API](https://github.com/engineer-man/piston) (`POST https://emkc.org/api/v2/piston/execute`) — keyless, sandboxed multi-file container execution.
-- **AI Socratic Coach** — Google Gemini 2.0 Flash (`gemini-2.0-flash`) providing 3-tier progressive hints without spoiling code solutions.
-- **Auth & Local Testing** — NextAuth.js with GitHub OAuth + lightweight Dual Guest Dev Bypass (`?guest=1` / `?guest=2` or one-click buttons).
-- **Networking** — Deterministic 1.5s short-polling backed by DynamoDB (zero external WebSocket servers).
+| Metric | Traditional DSA Platforms | CodeDuel Battleground |
+|---|---|---|
+| **Problem Domain** | Textbook arrays, graph traversal, dynamic programming | Production systems, race conditions, memory leaks, register flags |
+| **Code Structure** | Single-function sandbox with synthetic inputs | Multi-file modular architecture (`.h`, `.c`, `.ts`, types, test runner) |
+| **Feedback Loop** | Hidden test cases pass/fail | Live assertion telemetry, oscilloscope & simulated hardware registers |
+| **Competitive Pressure** | Asynchronous leaderboard or solo timer | Real-time 1v1 matchmaking with dynamic ELO delta |
+| **Educational Depth**| Memorized algorithmic patterns | Socratic AI hints (Gemini 2.0) + Root cause architecture walkthroughs |
+| **Institutional Use**| Not designed for universities or lab assignments | **Campus Mode** cohorts, join codes, faculty telemetry, assignment grading |
+
+---
+
+## 🛠️ Two Specialized Engineering Tracks
+
+### 1. Embedded Systems & Firmware (`EMBEDDED_SYSTEMS`)
+Tackle realistic driver and hardware anomalies on simulated ARM Cortex-M microcontrollers and RTOS environments:
+- **Cortex-M0 Unaligned Memory HardFault**: Automotive CAN packet parser throwing hardware faults on odd-byte address reads.
+- **Atomic Interrupt Concurrency & Telemetry Races**: Race condition between high-speed timer ISR and background task corrupting 64-bit timestamps (`PRIMASK` / `__disable_irq()`).
+- **UART Ring Buffer Wrap-Around**: Head/tail pointer collision causing silent buffer overflow and dropped serial telemetry.
+- **GPIO Contact Bounce Filter**: Mechanical switch glitches triggering spurious interrupts without a sustained debounce window.
+- **16-Bit IMU Endianness Decoding**: Swapped byte order and missing two's complement sign-extension in 3-axis accelerometer packets.
+- **Timer PWM Prescaler Off-by-One**: Missing register offset (+1) and unchecked duty cycle overflow driving BLDC motor RPM oscillation.
+
+### 2. Cloud & Production SWE (`PRODUCTION_SWE`)
+Diagnose high-throughput distributed systems failures and security vulnerabilities:
+- **Sub-Second Token Starvation in RateLimiter**: Integer truncation dropping fractional millisecond tokens between high-frequency bursts.
+- **Exponential Backoff Jitter Clamping**: RPC gateway stampeding downstreams due to negative delay subtractions.
+- **JWT Algorithm Confusion (CVE-2024-8812)**: Forged authentication tokens bypassing signature checks via case-variant `none` headers.
+- **Database Connection Pool Exhaustion**: Unhandled error paths failing to release borrowed connections until total service starvation.
+- **SingleFlight Cache Stampede**: Thundering herd overwhelming database on cold cache hits instead of coalescing into an in-flight promise.
+- **Async Stream Consumer Connection Leak**: Streaming worker queue failing to release connection handles on record validation rejections.
+
+---
+
+## 🌟 Core Features & Modules
+
+### 1. Real-Time 1v1 Battleground (`/match/[id]`)
+- **Deterministic Matchmaking**: Queue against real engineers with track filtering or instant-duel against `CodeSentinel AI [BOT]` with dynamic skill scaling.
+- **Monaco Multi-File IDE**: Full tabbed editor with read-only architecture files and editable source files.
+- **Simulated Hardware Panel**: Interactive digital oscilloscope, real-time logic analyzer, register monitor (`PRIMASK`, `CFSR`, `HFSR`, `MMFAR`), and bus frame inspector.
+- **Competitive ELO Engine**: Standardized Elo rating calculation with $K=32$ factor and rating floor protection ($800$ minimum).
+
+### 2. Solo Practice & Socratic Learning (`/practice`)
+- **Daily Challenge Loop**: Dedicated daily practice tickets with streak tracking.
+- **Socratic AI Hints**: Google Gemini 2.0 Flash integration offering progressive 3-tier hints without spoiling code solutions.
+- **Architectural Post-Mortems**: Comprehensive breakdowns with root causes, buggy-vs-fixed diffs, and real-world failure analyses.
+
+### 3. Campus & Academy Mode (`/campus`)
+- **Faculty Dashboard**: Create academic cohorts with unique 6-character join codes (e.g., `ECE-301-EMBEDDED`, `CS-210-SYSTEMS`).
+- **Lab Assignments**: Set deadlines, assign challenge tracks, and monitor student completion rates.
+- **Institutional Telemetry**: Track class average pass rates, time-to-fix metrics, and student ELO distribution.
+
+### 4. Verified Public Portfolios (`/u/[username]`)
+- **Recruiter-Ready Profiles**: Publicly shareable engineering cards with verified track badges.
+- **Skill Proficiency Breakdown**: Granular scoring across Memory Safety, Concurrency, Protocol Decoding, and System Architecture.
+- **Cryptographic Credential Verification (`/verify/[slug]`)**: Instant credential verification for completed track certifications.
+
+### 5. SaaS Pricing & Admin Metrics (`/pricing` & `/admin/metrics`)
+- **Tiered Model**: Free Student Tier, Campus Pro Tier ($19/mo or $15/seat/term), and Enterprise Department Tier.
+- **Usage Metrics Dashboard**: Live monitoring of active duels, daily submissions, API latency, and quota consumption.
+
+---
+
+## 🏗️ Architecture & Tech Stack
 
 ```
-Player A (Tab 1 / Guest 1) ──┐
-                             ├── Next.js Route Handlers ── AWS DynamoDB (Single-Table: CodeDuelTable)
-Player B (Tab 2 / Guest 2) ──┘        │
-                                      ├── Piston API (Multi-file bundle execution — TypeScript / C)
-                                      └── Gemini 2.0 Flash (3-tier Socratic debugging coach)
+┌─────────────────────────────────────────────────────────────┐
+│                       Client (Next.js 16)                   │
+│   Monaco Editor • Hardware Visualizer • Real-Time Duel Polling  │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ HTTPS / JSON
+┌──────────────────────────────▼──────────────────────────────┐
+│                   Next.js App Router API                    │
+│   /api/match • /api/campus • /api/practice • /api/challenges │
+└──────────────┬───────────────────────────┬──────────────────┘
+               │                           │
+┌──────────────▼─────────────┐ ┌───────────▼──────────────────┐
+│  Universal Storage Adapter │ │   Isolated Execution Engine  │
+│  • AWS DynamoDB (Single-T) │ │   • Sandboxed Piston API     │
+│  • Neon Serverless Postgres│ │   • Multi-File Container Run │
+│  • Local Persistent Cache  │ └──────────────────────────────┘
+└────────────────────────────┘
+```
+
+- **Frontend & App Router**: Next.js 16.2.9 (Turbopack), React 19.2.4, Tailwind CSS 4
+- **Code Editor**: Monaco Editor (`@monaco-editor/react`)
+- **Database Engine**: Neon Serverless PostgreSQL (`postgres` driver) with AWS DynamoDB adapter fallback
+- **Code Execution**: Piston Sandboxed Multi-File Engine (`C` with `gcc`, `TypeScript` with `tsx`, `Python` with `python3`)
+- **AI Intelligence**: Google Gemini 2.0 Flash (`@google/genai`)
+- **Authentication**: NextAuth.js with GitHub OAuth
+
+---
+
+## 🚀 Quick Start Guide
+
+### Prerequisites
+- Node.js 20+ installed
+- PostgreSQL database URL (Neon, Supabase, or local) **OR** AWS DynamoDB credentials
+
+### 1. Clone & Install
+```bash
+git clone https://github.com/your-username/codeduel.git
+cd codeduel
+npm install
+```
+
+### 2. Environment Setup
+Copy the example environment file:
+```bash
+cp .env.example .env.local
+```
+
+Configure your `.env.local`:
+```bash
+# Database (Neon Serverless PostgreSQL or local Postgres)
+DATABASE_URL=postgresql://user:password@ep-young-hill.pooler.aws.neon.tech/neondb?sslmode=require
+
+# NextAuth
+NEXTAUTH_SECRET=codeduel-super-secure-production-secret-key-32ch
+NEXTAUTH_URL=http://localhost:3000
+
+# Optional: GitHub OAuth (for public login)
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+
+# Optional: Google Gemini API (for AI Socratic hint coach)
+GEMINI_API_KEY=your_gemini_api_key
+
+# Optional: Dedicated Piston Execution Node (defaults to public Piston mirror)
+PISTON_URL=https://emkc.org/api/v2/piston
+```
+
+### 3. Run Automated Test Suites
+CodeDuel includes built-in verification scripts for all game logic:
+
+```bash
+# Run ELO algorithm unit tests (7 test cases, floor protection, probability symmetry)
+npm run test:elo
+
+# Verify all 12 challenge reference solutions (100% test pass rate)
+npm run test:solutions
+```
+
+### 4. Seed Demo Data
+Populate the database with verified engineers, active cohorts, and leaderboard records:
+```bash
+npm run seed:demo
+```
+
+### 5. Launch the Development Server
+```bash
+npm run dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## 🧪 Production Verification
+
+Run the full Next.js production build and TypeScript check:
+```bash
+npm run typecheck
+npm run build
+```
+
+Expected output:
+```
+✓ Compiled successfully
+✓ Finished TypeScript
+✓ Generating static pages (29/29)
+Finalizing page optimization ...
 ```
 
 ---
 
-## Seed Production Challenges (`lib/challenges.ts`)
-
-| Challenge ID | Track | Language | Repository | Issue Summary |
-|---|---|---|---|---|
-| `swe-token-bucket` | `PRODUCTION_SWE` | TypeScript | `oss-gateway/rate-limiter` | **PR #108: Fix Sub-Second Token Starvation in RateLimiter**<br>Integer truncation dropped fractional millisecond token replenishments between high-frequency bursts. |
-| `embedded-ring-buffer` | `EMBEDDED_SYSTEMS` | C | `embedded-os/drivers/serial` | **Issue #44: UART ISR Dropping Bytes on Ring Buffer Wrap-Around**<br>Head/tail collision confused full vs empty states; missing modulo wrap-around corrupted FIFO stream. |
-| `swe-retry-backoff` | `PRODUCTION_SWE` | TypeScript | `open-mesh/rpc-gateway` | **PR #242: Fix Exponential Backoff Jitter Clamping in RPC Gateway**<br>Negative delay subtraction triggered instant retries and thundering herd cascades. |
-| `embedded-gpio-debounce` | `EMBEDDED_SYSTEMS` | C | `zephyr-rtos/drivers/gpio` | **Issue #92: Mechanical Contact Bounce Glitch on Pin ISR**<br>State transitions committed prematurely without verifying the sustained debounce window. |
-| `swe-jwt-alg-confusion` | `PRODUCTION_SWE` | TypeScript | `open-auth/jwt-verify` | **CVE-2024-8812: Fix Signature Bypass on "none" Algorithm in Auth Middleware**<br>Case-variant "NONE" header allowed forging unsigned tokens and bypassing authorization. |
-| `swe-connection-pool-leak` | `PRODUCTION_SWE` | TypeScript | `hyper-db/pool-manager` | **Issue #419: Resolve Connection Pool Starvation Under Uncaught Errors**<br>Unhandled query errors skipped pool release, leaking connections until exhaustion. |
-| `swe-cache-stampede` | `PRODUCTION_SWE` | TypeScript | `cache-mesh/in-memory-lru` | **PR #145: SingleFlight Coalescing to Prevent Cache Stampede**<br>Simultaneous cache misses overwhelmed upstream DB instead of coalescing into an in-flight promise. |
-| `embedded-spi-endianness` | `EMBEDDED_SYSTEMS` | C | `aerospace-rtos/drivers/imu` | **Issue #117: Fix 16-Bit IMU Sensor Telemetry Endianness Packing**<br>Swapped byte order and missing two's complement sign-extension inverted accelerometer readings. |
-| `embedded-pwm-prescaler` | `EMBEDDED_SYSTEMS` | C | `bldc-firmware/hal/pwm` | **Bug #88: Motor RPM Oscillation from Timer Prescaler Off-by-One**<br>Missing register offset (+1) and unchecked duty cycle overflow caused 2x motor frequency drift. |
-| `swe-async-worker-leak` | `PRODUCTION_SWE` | Python | `fast-stream/worker-queue` | **PR #73: Fix Connection Starvation & Missing Cleanup in Async Stream Consumer**<br>Record validation errors bypassed client teardown, leaking hanging connections in pool. |
-
----
-
-## Local Development & 2-Tab Testing
-
-1. Clone repository and install dependencies:
-   ```bash
-   npm install
-   ```
-2. Configure `.env.local` (or run with defaults in development):
-   ```bash
-   AWS_REGION=eu-north-1
-   AWS_ACCESS_KEY_ID=...
-   AWS_SECRET_ACCESS_KEY=...
-   NEXTAUTH_SECRET=codeduel-development-secret-key-12345
-   NEXTAUTH_URL=http://localhost:3000
-   GEMINI_API_KEY=...
-   ```
-3. Run the development server:
-   ```bash
-   npm run dev
-   ```
-4. **Dual-Tab Match Testing without GitHub credentials:**
-   - Open Tab A: `http://localhost:3000/?guest=1` (Auto-logs in as `Guest_Alpha`, 1200 ELO)
-   - Open Tab B (or incognito): `http://localhost:3000/?guest=2` (Auto-logs in as `Guest_Beta`, 1200 ELO)
-   - Click **Find Match** in both tabs to test real-time 1v1 duels!
-5. **Instant Demo vs AI Bot:**
-   - Click **Instant Match vs Mock Bot** or queue for > 10 seconds to duel `CodeSentinel AI [BOT]`, which simulates progressive test passing over 40 seconds.
-
----
-
-## DynamoDB Single-Table Schema (`CodeDuelTable`)
-
-- `USER#<id>` / `PROFILE`: Player rating, win/loss record, avatar.
-- `USER#<id>` / `LEADERBOARD`: GSI1PK=`LEADERBOARD#GLOBAL`, GSI1SK=`elo` (sorts highest ELO first).
-- `QUEUE#<userId>` / `WAITING`: Active matchmaking queue with track filter and 5-min TTL.
-- `MATCH#<matchId>` / `META`: Live match session, track, challenge ID, player slots, real-time tests passed (`0/3`), and 2-hr TTL.
+## 📜 License
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

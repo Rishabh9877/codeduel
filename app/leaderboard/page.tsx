@@ -346,7 +346,9 @@ export default function LeaderboardPage() {
           {status === "authenticated" ? (
             <>
               <Link href="/dashboard" className="lb-nav-link">Dashboard</Link>
+              <Link href="/practice" className="lb-nav-link">Solo</Link>
               <Link href="/leaderboard" className="lb-nav-link active">Leaderboard</Link>
+              <Link href="/campus" className="lb-nav-link">Campus</Link>
               <Link href="/friends" className="lb-nav-link">Friends</Link>
               <Link href="/profile" className="lb-nav-link">Profile</Link>
             </>

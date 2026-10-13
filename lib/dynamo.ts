@@ -66,8 +66,6 @@ function initDefaultData() {
     { userId: "eng_103", username: "Silicon_Carmack",  avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=John", elo: 2280, wins: 69, losses: 15, track: "EMBEDDED_SYSTEMS" },
     { userId: "eng_104", username: "Tokio_AsyncMaster", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Tokio", elo: 2190, wins: 54, losses: 18, track: "PRODUCTION_SWE" },
     { userId: "eng_105", username: "Firmware_Ghost",    avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=Ghost", elo: 2105, wins: 48, losses: 20, track: "EMBEDDED_SYSTEMS" },
-    { userId: "guest_1", username: "Guest_Alpha",       avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=guest1", elo: 1245, wins: 2, losses: 0, track: "PRODUCTION_SWE" },
-    { userId: "guest_2", username: "Guest_Beta",        avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=guest2", elo: 1200, wins: 0, losses: 2, track: "PRODUCTION_SWE" },
   ];
 
   for (const u of seedUsers) {

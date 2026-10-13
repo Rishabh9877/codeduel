@@ -33,6 +33,9 @@ export async function GET() {
         elo: 1200,
         wins: 0,
         losses: 0,
+        skillsPracticed: [],
+        streak: 0,
+        lastDailyCompleted: null,
         createdAt: Date.now(),
       };
       await dynamo.send(new PutCommand({ TableName: TABLE, Item: initialProfile }));
@@ -168,6 +171,11 @@ export async function GET() {
       totalMatches,
       winRate,
       joinedAt: new Date(dynItem.createdAt ?? Date.now()).toISOString(),
+      skillsPracticed: Array.isArray(dynItem.skillsPracticed) ? dynItem.skillsPracticed : [],
+      streak: Number(dynItem.streak ?? 0),
+      lastDailyCompleted: dynItem.lastDailyCompleted ?? null,
+      isPublic: dynItem.isPublic !== false,
+      showMatchHistory: dynItem.showMatchHistory !== false,
       eloHistory,
       recentMatches,
       activityMap,

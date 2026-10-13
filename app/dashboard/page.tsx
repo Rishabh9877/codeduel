@@ -619,7 +619,9 @@ export default function Dashboard() {
         <Link href="/" className="db-brand">CodeDuel</Link>
         <div className="db-nav-links">
           <Link href="/dashboard" className="db-nav-link active">Dashboard</Link>
+          <Link href="/practice" className="db-nav-link">Solo</Link>
           <Link href="/leaderboard" className="db-nav-link">Leaderboard</Link>
+          <Link href="/campus" className="db-nav-link">Campus</Link>
           <Link href="/friends" className="db-nav-link">Friends</Link>
           <Link href="/profile" className="db-nav-link">Profile</Link>
         </div>

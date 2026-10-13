@@ -22,6 +22,11 @@ export async function GET(req: Request) {
       totalTests: c.totalTests,
       filesCount: c.files.length,
       editableFile: c.files.find((f) => !f.readOnly)?.name ?? '',
+      difficulty: c.difficulty,
+      estimatedMinutes: c.estimatedMinutes,
+      skills: c.skills,
+      hiddenTestsCount: c.hiddenTestsCount,
+      hasHardwareSimulation: !!c.hardwareContext,
     }));
 
     return NextResponse.json({

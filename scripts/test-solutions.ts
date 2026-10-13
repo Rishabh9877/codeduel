@@ -287,11 +287,96 @@ def process_batch(tracker: ConnectionTracker, batch_id: int, records: list) -> i
         return processed
     finally:
         conn.close()`
+  },
+
+  'embedded-interrupt-race': {
+    'telemetry.c': `#include "telemetry.h"
+#include "registers.h"
+#include <string.h>
+
+static volatile uint32_t packet_count = 0;
+static volatile uint32_t dropped_packets = 0;
+static volatile uint64_t last_timestamp_us = 0;
+static volatile bool isr_active = false;
+
+void telemetry_init(void) {
+  packet_count = 0;
+  dropped_packets = 0;
+  last_timestamp_us = 0;
+  isr_active = false;
+}
+
+void telemetry_isr_handler(uint64_t timestamp_us) {
+  isr_active = true;
+  packet_count++;
+  last_timestamp_us = timestamp_us;
+  isr_active = false;
+}
+
+telemetry_stats_t telemetry_get_stats_atomic(void) {
+  telemetry_stats_t stats;
+  uint32_t primask = __get_PRIMASK();
+  __disable_irq();
+  stats.packet_count = packet_count;
+  stats.dropped_packets = dropped_packets;
+  stats.last_timestamp_us = last_timestamp_us;
+  stats.isr_active = isr_active;
+  if (!primask) {
+    __enable_irq();
+  }
+  return stats;
+}
+
+bool telemetry_wait_for_packets(uint32_t target_count, uint32_t timeout_loops) {
+  uint32_t loops = 0;
+  while (packet_count < target_count) {
+    loops++;
+    if (loops > timeout_loops) {
+      return false;
+    }
+  }
+  return true;
+}`
+  },
+
+  'embedded-packed-alignment': {
+    'can_parser.c': `#include "can_parser.h"
+#include "registers.h"
+#include <string.h>
+
+uint16_t parse_uint16_safe(const uint8_t *buffer, uint8_t offset) {
+  uint16_t result = 0;
+  memcpy(&result, buffer + offset, sizeof(uint16_t));
+  return result;
+}
+
+uint32_t parse_uint32_safe(const uint8_t *buffer, uint8_t offset) {
+  uint32_t result = 0;
+  memcpy(&result, buffer + offset, sizeof(uint32_t));
+  return result;
+}
+
+obd2_telemetry_t parse_obd2_frame(const can_raw_frame_t *frame) {
+  obd2_telemetry_t tel;
+  memset(&tel, 0, sizeof(tel));
+
+  if (!frame || frame->dlc < 8) {
+    tel.valid = false;
+    return tel;
+  }
+
+  tel.rpm = parse_uint16_safe(frame->data, 1);
+  tel.odometer_km = parse_uint32_safe(frame->data, 3);
+  tel.coolant_temp = frame->data[7];
+  tel.valid = true;
+
+  return tel;
+}`
   }
 };
 
 async function main() {
-  console.log("=== VERIFYING SOLUTIONS FOR ALL 10 CHALLENGES ===");
+  console.log("=== VERIFYING SOLUTIONS FOR ALL 12 CHALLENGES ===");
   let allGood = true;
 
   for (const [id, challenge] of Object.entries(SEED_CHALLENGES)) {

@@ -5,6 +5,8 @@ import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Editor from "@monaco-editor/react";
+import { SimulatedHardwarePanel } from "@/components/SimulatedHardwarePanel";
+import type { HardwareContext } from "@/lib/challenges";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,8 @@ export interface Challenge {
   files: ChallengeFile[];
   entrypoint: string;
   totalTests: number;
+  hardwareContext?: HardwareContext;
+  hiddenTestsCount?: number;
 }
 
 export interface PlayerSlot {
@@ -111,6 +115,7 @@ export default function MatchArena() {
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<"testResults" | "logs">("testResults");
+  const [leftTab, setLeftTab] = useState<"ticket" | "hardware">("ticket");
 
   // AI Coach state (Gemini 2.0 Flash)
   const [showCoach, setShowCoach] = useState(false);
@@ -446,7 +451,7 @@ export default function MatchArena() {
           {/* Opponent */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: opponentPlayer?.isBot ? "#fbbf24" : "#f87171" }}>
-              {opponentPlayer?.username || "Opponent"}
+              {opponentPlayer?.username || "Opponent"}{opponentPlayer?.isBot ? " (Bot)" : ""}
             </span>
             <div style={{
               display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.06)",
@@ -539,22 +544,68 @@ export default function MatchArena() {
           overflowY: "auto"
         }}>
           {/* Header */}
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            <h1 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 6 }}>
+          <div style={{ padding: "14px 18px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <h1 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 6 }}>
               {challenge.title}
             </h1>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <span style={{ fontSize: 11, color: "#8b8eff", fontFamily: "'JetBrains Mono', monospace" }}>
-                Target: {challenge.totalTests} Unit Tests Required
+                Target: {challenge.hiddenTestsCount ? `${challenge.totalTests - challenge.hiddenTestsCount} Visible + ${challenge.hiddenTestsCount} Hidden` : `${challenge.totalTests}`} Tests Required
               </span>
               <span style={{ color: "rgba(255,255,255,0.2)" }}>•</span>
               <span style={{ fontSize: 11, color: "#8a8898", fontFamily: "'JetBrains Mono', monospace" }}>
-                Test Runner: {challenge.entrypoint}
+                Runner: {challenge.entrypoint}
               </span>
             </div>
+
+            {/* Hardware vs Ticket Tab Toggle (if hardwareContext exists) */}
+            {challenge.hardwareContext && (
+              <div style={{ display: "flex", gap: 4, marginTop: 10, background: "rgba(255,255,255,0.04)", padding: 2, borderRadius: 6 }}>
+                <button
+                  onClick={() => setLeftTab("ticket")}
+                  style={{
+                    flex: 1,
+                    background: leftTab === "ticket" ? "#151624" : "transparent",
+                    color: leftTab === "ticket" ? "#fff" : "#8a8898",
+                    border: "none",
+                    borderRadius: 4,
+                    padding: "5px 10px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  📋 Ticket Brief
+                </button>
+                <button
+                  onClick={() => setLeftTab("hardware")}
+                  style={{
+                    flex: 1,
+                    background: leftTab === "hardware" ? "rgba(251,191,36,0.18)" : "transparent",
+                    color: leftTab === "hardware" ? "#fbbf24" : "#8a8898",
+                    border: "none",
+                    borderRadius: 4,
+                    padding: "5px 10px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  ⚡ Hardware & Scope
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Ticket Body */}
+          {/* Conditional Left Body: Hardware Panel OR Ticket Brief */}
+          {leftTab === "hardware" && challenge.hardwareContext ? (
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <SimulatedHardwarePanel
+                hardwareContext={challenge.hardwareContext}
+                hiddenTestsCount={challenge.hiddenTestsCount}
+              />
+            </div>
+          ) : (
           <div style={{ padding: "20px", flex: 1, fontSize: 13, lineHeight: 1.6, color: "#c8c6d4" }}>
             <div style={{
               background: "rgba(255,255,255,0.02)",
@@ -615,6 +666,7 @@ export default function MatchArena() {
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* RIGHT PANEL: Multi-File Monaco Editor Workspace */}
@@ -1046,7 +1098,7 @@ export default function MatchArena() {
                 ? "You satisfied all production test requirements before your opponent!"
                 : won === false
                 ? (finalMatchPayload?.winnerId === "bot_sentinel_ai"
-                    ? "CodeSentinel AI passed all unit tests over 40 seconds."
+                    ? "CodeSentinel AI (Bot) passed all unit tests over 40 seconds."
                     : "The opponent patched the bug first.")
                 : "Match expired without a winning patch."}
             </p>
