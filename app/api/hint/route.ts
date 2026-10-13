@@ -160,32 +160,38 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
     if (!GEMINI_API_KEY) {
       console.error("[hint] GEMINI_API_KEY is not set — using fallback hint");
     } else {
-      const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+      const candidateModels = ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.8-flash"];
+      let succeeded = false;
 
-      const response = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ role: "user", parts: [{ text: userMessage }] }],
-          generationConfig: {
-            maxOutputTokens: 300,
-            temperature: 0.7,
-          },
-        }),
-      });
+      for (const model of candidateModels) {
+        try {
+          const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+          const response = await fetch(GEMINI_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+              contents: [{ role: "user", parts: [{ text: userMessage }] }],
+              generationConfig: {
+                maxOutputTokens: 300,
+                temperature: 0.7,
+              },
+            }),
+          });
 
-      const data = await response.json();
-
-      if (!response.ok || data.error) {
-        console.error("[hint] Gemini API error:", JSON.stringify(data));
-      } else {
-        const generated = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (generated?.trim()) {
-          hint = sanitizeHint(generated.trim());
-        } else {
-          console.warn("[hint] Gemini returned empty candidates — using fallback.");
+          const data = await response.json();
+          if (response.ok && !data.error && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+            hint = sanitizeHint(data.candidates[0].content.parts[0].text.trim());
+            succeeded = true;
+            break;
+          }
+        } catch (callErr) {
+          console.warn(`[hint] Model ${model} call error:`, callErr);
         }
+      }
+
+      if (!succeeded) {
+        console.warn("[hint] All Gemini models unavailable or rate-limited; falling back to curated Socratic guidance.");
       }
     }
   } catch (err) {
