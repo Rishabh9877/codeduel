@@ -31,6 +31,7 @@ const MAX_TOTAL_CODE_SIZE_BYTES = 200_000;
 const PISTON_LANGUAGE_MAP: Record<string, { language: string; version: string }> = {
   typescript: { language: 'typescript', version: '5.0.3' },
   c:          { language: 'c',          version: '10.2.0' },
+  python:     { language: 'python',     version: '3.10.0' },
 };
 
 export interface ChallengeExecutionResult {
@@ -85,7 +86,7 @@ async function executeTypeScriptLocally(
       return {};
     };
 
-    function runFile(filename: string, source: string) {
+    async function runFile(filename: string, source: string) {
       const baseName = filename.replace(/\.(ts|js)$/, "");
       if (modules[baseName]) return;
 
@@ -104,27 +105,38 @@ async function executeTypeScriptLocally(
         module: moduleObj,
         exports: moduleObj.exports,
         require: requireShim,
+        Buffer,
         Date,
         Math,
         setTimeout,
         clearTimeout,
+        URL,
+        URLSearchParams,
+        TextEncoder,
+        TextDecoder,
         process: { exit: () => {} },
       });
 
-      vm.runInContext(js, context, { timeout: 3000 });
+      const res = vm.runInContext(js, context, { timeout: 4000 });
+      if (res && typeof res.then === "function") {
+        await res;
+      }
       modules[baseName] = moduleObj.exports;
     }
 
     // Execute dependencies first, then entrypoint
     const nonEntry = mergedFiles.filter((f) => f.name !== entrypoint);
     for (const f of nonEntry) {
-      runFile(f.name, f.content);
+      await runFile(f.name, f.content);
     }
 
     const entry = mergedFiles.find((f) => f.name === entrypoint);
     if (entry) {
-      runFile(entry.name, entry.content);
+      await runFile(entry.name, entry.content);
     }
+
+    // Allow any pending microtasks/promises to flush
+    await new Promise((resolve) => setTimeout(resolve, 80));
 
     const stdout = stdoutLines.join("\n");
     const stderr = stderrLines.join("\n");
@@ -171,12 +183,24 @@ async function executeCLocally(
       fs.writeFileSync(path.join(tmpDir, f.name), f.content, "utf-8");
     }
 
-    const cFiles = mergedFiles.filter((f) => f.name.endsWith(".c")).map((f) => f.name);
+    // Single-pass vs multi-translation unit detection:
+    // If entrypoint #includes other .c files, compile only entrypoint to prevent duplicate symbols.
+    const entrypointSource = mergedFiles.find((f) => f.name === entrypoint)?.content ?? "";
+    const cFilesToCompile = [entrypoint];
+    for (const f of mergedFiles) {
+      if (f.name.endsWith(".c") && f.name !== entrypoint) {
+        if (!entrypointSource.includes(f.name)) {
+          cFilesToCompile.push(f.name);
+        }
+      }
+    }
+
     const binPath = path.join(tmpDir, "challenge_bin");
+    const compiler = process.platform === "win32" ? "gcc" : "clang";
 
     // Compile
     try {
-      await execFileAsync("clang", ["-O2", ...cFiles, "-o", binPath], { cwd: tmpDir, timeout: 8000 });
+      await execFileAsync(compiler, ["-O2", ...cFilesToCompile, "-o", binPath], { cwd: tmpDir, timeout: 8000 });
     } catch (compileErr: any) {
       return {
         passed: 0,
@@ -206,14 +230,102 @@ async function executeCLocally(
       testResults,
     };
   } catch (runErr: any) {
+    const stdout = runErr.stdout ?? "";
+    const stderr = (runErr.stderr || "").trim();
+    const runtimeMs = Date.now() - start;
+    const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
+
+    if (stdout.includes("SUMMARY:") || testResults.length > 0) {
+      return {
+        passed,
+        total,
+        allPassed: false,
+        stdout,
+        stderr: stderr || "",
+        runtimeMs,
+        status: "wrong_answer",
+        testResults,
+      };
+    }
+
     return {
       passed: 0,
       total: expectedTotal,
       allPassed: false,
-      stdout: runErr.stdout ?? "",
-      stderr: runErr.stderr || runErr.message,
-      runtimeMs: Date.now() - start,
-      status: "runtime_error",
+      stdout,
+      stderr,
+      runtimeMs,
+      status: runErr.killed ? "timeout" : "runtime_error",
+      testResults: [],
+    };
+  } finally {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch (_) {}
+  }
+}
+
+// ── Built-In Python Runner ───────────────────────────────────────────────────
+
+async function executePythonLocally(
+  mergedFiles: { name: string; content: string }[],
+  entrypoint: string,
+  expectedTotal: number
+): Promise<ChallengeExecutionResult> {
+  const start = Date.now();
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeduel-py-"));
+
+  try {
+    for (const f of mergedFiles) {
+      fs.writeFileSync(path.join(tmpDir, f.name), f.content, "utf-8");
+    }
+
+    const pythonCmd = process.env.PYTHON_PATH || (process.platform === "win32" ? "python" : "python3");
+    const { stdout, stderr } = await execFileAsync(pythonCmd, [entrypoint], {
+      cwd: tmpDir,
+      timeout: 5000,
+      env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONDONTWRITEBYTECODE: "1" },
+    });
+    const runtimeMs = Date.now() - start;
+    const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
+
+    return {
+      passed,
+      total,
+      allPassed: passed === total && total > 0,
+      stdout,
+      stderr,
+      runtimeMs,
+      status: passed === total && total > 0 ? "accepted" : "wrong_answer",
+      testResults,
+    };
+  } catch (runErr: any) {
+    const stdout = runErr.stdout ?? "";
+    const stderr = (runErr.stderr || "").trim();
+    const runtimeMs = Date.now() - start;
+    const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
+
+    if (stdout.includes("SUMMARY:") || testResults.length > 0) {
+      return {
+        passed,
+        total,
+        allPassed: false,
+        stdout,
+        stderr: stderr || "",
+        runtimeMs,
+        status: "wrong_answer",
+        testResults,
+      };
+    }
+
+    return {
+      passed: 0,
+      total: expectedTotal,
+      allPassed: false,
+      stdout,
+      stderr,
+      runtimeMs,
+      status: runErr.killed ? "timeout" : "runtime_error",
       testResults: [],
     };
   } finally {
@@ -328,6 +440,10 @@ export async function executeChallenge(
 
   if (challenge.language === 'c') {
     return await executeCLocally(mergedFiles, challenge.entrypoint, challenge.totalTests);
+  }
+
+  if (challenge.language === 'python') {
+    return await executePythonLocally(mergedFiles, challenge.entrypoint, challenge.totalTests);
   }
 
   return {

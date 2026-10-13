@@ -17,7 +17,7 @@ export interface ChallengeFile {
 export interface Challenge {
   id: string;
   track: 'PRODUCTION_SWE' | 'EMBEDDED_SYSTEMS';
-  language: 'typescript' | 'c';
+  language: 'typescript' | 'c' | 'python';
   title: string;
   repoContext: string;
   ticketMarkdown: string;
@@ -284,6 +284,7 @@ export default function MatchArena() {
     if (!activeFileName) return "typescript";
     if (activeFileName.endsWith(".ts") || activeFileName.endsWith(".tsx") || activeFileName.endsWith(".js")) return "typescript";
     if (activeFileName.endsWith(".c") || activeFileName.endsWith(".h")) return "c";
+    if (activeFileName.endsWith(".py")) return "python";
     if (activeFileName.endsWith(".json")) return "json";
     if (activeFileName.endsWith(".md")) return "markdown";
     return "plaintext";

@@ -217,6 +217,12 @@ const PROBLEMS = [
   { id: "embedded-ring-buffer", title: "UART FIFO Wrap-Around Glitch", diff: "hard", track: "EMBEDDED_SYSTEMS", lang: "C", repo: "embedded-os/drivers/serial" },
   { id: "swe-retry-backoff", title: "Exponential Backoff Jitter Drift", diff: "medium", track: "PRODUCTION_SWE", lang: "TypeScript", repo: "open-mesh/rpc-gateway" },
   { id: "embedded-gpio-debounce", title: "Mechanical Switch Contact Bounce", diff: "hard", track: "EMBEDDED_SYSTEMS", lang: "C", repo: "zephyr-rtos/drivers/gpio" },
+  { id: "swe-jwt-alg-confusion", title: 'JWT "none" Signature Bypass', diff: "hard", track: "PRODUCTION_SWE", lang: "TypeScript", repo: "open-auth/jwt-verify" },
+  { id: "swe-connection-pool-leak", title: "DB Connection Pool Starvation", diff: "medium", track: "PRODUCTION_SWE", lang: "TypeScript", repo: "hyper-db/pool-manager" },
+  { id: "swe-cache-stampede", title: "SingleFlight Cache Stampede", diff: "hard", track: "PRODUCTION_SWE", lang: "TypeScript", repo: "cache-mesh/in-memory-lru" },
+  { id: "embedded-spi-endianness", title: "16-Bit IMU Sensor Endianness", diff: "medium", track: "EMBEDDED_SYSTEMS", lang: "C", repo: "aerospace-rtos/drivers/imu" },
+  { id: "embedded-pwm-prescaler", title: "PWM Motor Prescaler Drift", diff: "medium", track: "EMBEDDED_SYSTEMS", lang: "C", repo: "bldc-firmware/hal/pwm" },
+  { id: "swe-async-worker-leak", title: "Async Stream Connection Leak", diff: "medium", track: "PRODUCTION_SWE", lang: "Python", repo: "fast-stream/worker-queue" },
 ];
 const MOCK_MATCHES = [
   { opponent: "CodeSentinel AI", problem: "RateLimiter Sub-Second Refill", result: "Win",  elo: "+16", ago: "15m ago"  },
@@ -301,7 +307,8 @@ export default function Dashboard() {
     return false;
   });
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [selectedProblem, setSelectedProblem] = useState<{id: string, title: string} | null>(null);
+  const [selectedProblem, setSelectedProblem] = useState<{id: string, title: string, track?: string} | null>(null);
+  const [problemTrackFilter, setProblemTrackFilter] = useState<"ALL" | "PRODUCTION_SWE" | "EMBEDDED_SYSTEMS">("ALL");
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/");
@@ -732,7 +739,7 @@ export default function Dashboard() {
 
               {/* Option 3: Instant Demo / Sentinel AI */}
               <button 
-                onClick={() => { setShowMatchModal(false); handleFindMatch({ demo: true, challengeId: selectedProblem?.id }); setSelectedProblem(null); }}
+                onClick={() => { setShowMatchModal(false); handleFindMatch({ demo: true, challengeId: selectedProblem?.id, track: selectedProblem?.track as any }); setSelectedProblem(null); }}
                 style={{
                   background: "rgba(74,222,128,0.1)", color: "#fff", border: "1px solid rgba(74,222,128,0.3)",
                   padding: "12px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
@@ -977,15 +984,44 @@ export default function Dashboard() {
 
         {/* Production Engineering Challenges */}
         <div className="card">
-          <div className="card-hdr">
-            <span className="card-title">Production Engineering Battleground</span>
-            <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--muted2)" }}>
-              Multi-file bug triage & automated test verification
-            </span>
+          <div className="card-hdr" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <span className="card-title">Production Engineering Battleground</span>
+              <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "var(--muted2)", marginTop: 2 }}>
+                10 Real-world incidents · Multi-file bug triage & automated test verification
+              </div>
+            </div>
+
+            {/* Track Filter Pills */}
+            <div style={{ display: "flex", gap: 6, background: "rgba(255,255,255,0.04)", padding: 4, borderRadius: 8, border: "1px solid var(--border)" }}>
+              {[
+                { id: "ALL", label: `All (${PROBLEMS.length})` },
+                { id: "PRODUCTION_SWE", label: `Cloud SWE (${PROBLEMS.filter(p => p.track === "PRODUCTION_SWE").length})` },
+                { id: "EMBEDDED_SYSTEMS", label: `Embedded (${PROBLEMS.filter(p => p.track === "EMBEDDED_SYSTEMS").length})` },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setProblemTrackFilter(f.id as any)}
+                  style={{
+                    background: problemTrackFilter === f.id ? "rgba(139,142,255,0.2)" : "transparent",
+                    color: problemTrackFilter === f.id ? "#fff" : "var(--muted2)",
+                    border: problemTrackFilter === f.id ? "1px solid rgba(139,142,255,0.4)" : "1px solid transparent",
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="problems-grid">
-            {PROBLEMS.map((p: any, i: number) => (
-              <div className="prob-card" key={i}>
+            {PROBLEMS.filter(p => problemTrackFilter === "ALL" || p.track === problemTrackFilter).map((p: any, i: number) => (
+              <div className="prob-card" key={p.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div className="prob-diff" style={{ color: DIFF_COLORS[p.diff], margin: 0 }}>
                     {p.diff}
@@ -1008,7 +1044,7 @@ export default function Dashboard() {
                 </div>
                 <button 
                   className="prob-action" 
-                  onClick={() => { setSelectedProblem({ id: p.id, title: p.title }); setShowMatchModal(true); }}
+                  onClick={() => { setSelectedProblem({ id: p.id, title: p.title, track: p.track }); setShowMatchModal(true); }}
                   style={{ background: "none", border: "none", cursor: "pointer" }}
                 >
                   Inspect & Duel →

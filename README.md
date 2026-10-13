@@ -39,6 +39,14 @@ Player B (Tab 2 / Guest 2) ──┘        │
 |---|---|---|---|---|
 | `swe-token-bucket` | `PRODUCTION_SWE` | TypeScript | `oss-gateway/rate-limiter` | **PR #108: Fix Sub-Second Token Starvation in RateLimiter**<br>Integer truncation dropped fractional millisecond token replenishments between high-frequency bursts. |
 | `embedded-ring-buffer` | `EMBEDDED_SYSTEMS` | C | `embedded-os/drivers/serial` | **Issue #44: UART ISR Dropping Bytes on Ring Buffer Wrap-Around**<br>Head/tail collision confused full vs empty states; missing modulo wrap-around corrupted FIFO stream. |
+| `swe-retry-backoff` | `PRODUCTION_SWE` | TypeScript | `open-mesh/rpc-gateway` | **PR #242: Fix Exponential Backoff Jitter Clamping in RPC Gateway**<br>Negative delay subtraction triggered instant retries and thundering herd cascades. |
+| `embedded-gpio-debounce` | `EMBEDDED_SYSTEMS` | C | `zephyr-rtos/drivers/gpio` | **Issue #92: Mechanical Contact Bounce Glitch on Pin ISR**<br>State transitions committed prematurely without verifying the sustained debounce window. |
+| `swe-jwt-alg-confusion` | `PRODUCTION_SWE` | TypeScript | `open-auth/jwt-verify` | **CVE-2024-8812: Fix Signature Bypass on "none" Algorithm in Auth Middleware**<br>Case-variant "NONE" header allowed forging unsigned tokens and bypassing authorization. |
+| `swe-connection-pool-leak` | `PRODUCTION_SWE` | TypeScript | `hyper-db/pool-manager` | **Issue #419: Resolve Connection Pool Starvation Under Uncaught Errors**<br>Unhandled query errors skipped pool release, leaking connections until exhaustion. |
+| `swe-cache-stampede` | `PRODUCTION_SWE` | TypeScript | `cache-mesh/in-memory-lru` | **PR #145: SingleFlight Coalescing to Prevent Cache Stampede**<br>Simultaneous cache misses overwhelmed upstream DB instead of coalescing into an in-flight promise. |
+| `embedded-spi-endianness` | `EMBEDDED_SYSTEMS` | C | `aerospace-rtos/drivers/imu` | **Issue #117: Fix 16-Bit IMU Sensor Telemetry Endianness Packing**<br>Swapped byte order and missing two's complement sign-extension inverted accelerometer readings. |
+| `embedded-pwm-prescaler` | `EMBEDDED_SYSTEMS` | C | `bldc-firmware/hal/pwm` | **Bug #88: Motor RPM Oscillation from Timer Prescaler Off-by-One**<br>Missing register offset (+1) and unchecked duty cycle overflow caused 2x motor frequency drift. |
+| `swe-async-worker-leak` | `PRODUCTION_SWE` | Python | `fast-stream/worker-queue` | **PR #73: Fix Connection Starvation & Missing Cleanup in Async Stream Consumer**<br>Record validation errors bypassed client teardown, leaking hanging connections in pool. |
 
 ---
 
