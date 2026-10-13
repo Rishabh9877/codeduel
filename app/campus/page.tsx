@@ -345,7 +345,7 @@ export default function CampusPage() {
               Practical Incident Triage Labs for Engineering Curricula
             </h1>
             <p style={{ fontSize: 13, color: "#8a8898", margin: 0, maxWidth: 680, lineHeight: 1.5 }}>
-              Enable professors and TAs in <strong>Electronics, Embedded Systems (ECE)</strong> and <strong>Computer Science</strong> courses to assign live modular debugging labs with automated test execution, anti-cheat tracking, and course-specific leaderboards.
+              Enable professors, TAs, and <strong>Placement Cells</strong> to run automated debugging labs for <strong>ECE / Embedded Systems</strong>, <strong>Core Cloud Software</strong>, and <strong>Service-Based IT Assessment tests (TCS NQT, Infosys, Cognizant, Accenture)</strong> with instant automated grading and cohort telemetry.
             </p>
           </div>
           <div style={{ display: "flex", gap: 12 }}>
@@ -360,6 +360,10 @@ export default function CampusPage() {
             <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "10px 14px", textAlign: "center" }}>
               <div style={{ fontSize: 18, fontWeight: 800, color: "#fbbf24" }}>6+</div>
               <div style={{ fontSize: 10, color: "#6e6d7a", textTransform: "uppercase" }}>Embedded C Labs</div>
+            </div>
+            <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "10px 14px", textAlign: "center" }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#38bdf8" }}>Dual</div>
+              <div style={{ fontSize: 10, color: "#6e6d7a", textTransform: "uppercase" }}>Product &amp; IT Service</div>
             </div>
           </div>
         </div>

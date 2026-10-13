@@ -669,6 +669,53 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* SECTION 4.5: PLACEMENT & IT RECRUITMENT READINESS */}
+        <hr className="fade-divider" />
+        <section id="placement">
+          <div style={{ textAlign: "center", marginBottom: "36px" }}>
+            <span className="eyebrow-sm reveal">Campus Placements & IT Recruitment</span>
+            <h2 className="section-title reveal" style={{ maxWidth: "760px", margin: "0 auto 10px" }}>
+              Trained for Tier-1 Product Engineering &amp; Service-Based IT Assessments.
+            </h2>
+            <p className="section-sub reveal" style={{ maxWidth: "680px", margin: "0 auto" }}>
+              Whether students are targeting core hardware giants and cloud systems, or preparing for high-volume IT services technical assessments (TCS NQT, Infosys, Cognizant, Wipro, Accenture), CodeDuel trains them to isolate edge cases and pass time-pressured coding tests.
+            </p>
+          </div>
+          <div className="tracks-grid reveal-stagger">
+            <div className="track-card" style={{ borderColor: "rgba(56,189,248,0.25)" }}>
+              <span className="track-badge" style={{ background: "rgba(56,189,248,0.12)", color: "var(--cyan)", border: "1px solid rgba(56,189,248,0.25)" }}>
+                Tier-1 Product &amp; Hardware Tracks
+              </span>
+              <h3>Core Systems, Semiconductors &amp; Cloud</h3>
+              <p>
+                Qualcomm, Texas Instruments, Google, and high-growth startups test low-level memory layout, concurrency, and real-time RTOS drivers.
+              </p>
+              <ul className="track-tags">
+                <li>ARM Cortex-M Hardware Faults</li>
+                <li>UART / SPI Protocol Drivers</li>
+                <li>Distributed Token Bucket Limits</li>
+                <li>PostgreSQL Connection Pools</li>
+              </ul>
+            </div>
+
+            <div className="track-card" style={{ borderColor: "rgba(139,142,255,0.25)" }}>
+              <span className="track-badge" style={{ background: "rgba(139,142,255,0.12)", color: "var(--indigo)", border: "1px solid rgba(139,142,255,0.25)" }}>
+                Service-Based IT &amp; NQT Assessment Track
+              </span>
+              <h3>Mass Recruiter Coding Rounds &amp; Enterprise Triage</h3>
+              <p>
+                TCS NQT, Cognizant GenC, Infosys HackWithInfy, and Accenture technical evaluations test edge-case isolation, boundary errors, and bug resolution under clock pressure.
+              </p>
+              <ul className="track-tags">
+                <li>Boundary Condition &amp; Wrap-Around</li>
+                <li>String &amp; Token Parsing Edge Cases</li>
+                <li>Async Worker Starvation</li>
+                <li>Automated Test Assertion Speed</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         {/* SECTION 5: PRICING TEASER */}
         <hr className="fade-divider" />
         <section id="pricing">

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import Providers from "./providers";
 import GlobalToaster from "@/components/GlobalToaster";
 import CursorGlow from "@/components/CursorGlow";
+import SubtleInteractiveBackground from "@/components/SubtleInteractiveBackground";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,12 +33,13 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-950 text-white`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-950 text-white min-h-screen overflow-x-hidden`}
       >
         <Providers>
+          <SubtleInteractiveBackground />
           <CursorGlow />
           <GlobalToaster />
-          {children}
+          <div className="relative z-10">{children}</div>
         </Providers>
       </body>
     </html>
