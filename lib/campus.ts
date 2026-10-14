@@ -47,7 +47,7 @@ export const SEEDED_COHORTS: Array<Cohort & { assignments: CohortAssignment[]; s
     instructorName: "Prof. Vikram Malhotra (Embedded Systems & IoT Lab)",
     description: "Hands-on low-level firmware debugging: race conditions, ISRs, UART ring buffers, and ARM Cortex memory alignment.",
     createdAt: "2026-09-01T08:00:00.000Z",
-    studentCount: 32,
+    studentCount: 0,
     assignmentsCount: 4,
     assignments: [
       {
@@ -91,44 +91,7 @@ export const SEEDED_COHORTS: Array<Cohort & { assignments: CohortAssignment[]; s
         createdAt: "2026-09-26T10:00:00.000Z",
       },
     ],
-    students: [
-      {
-        userId: "student_aarav",
-        username: "Aarav Mehta (PEC ECE '25)",
-        avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=aaravm",
-        elo: 1345,
-        enrolledAt: "2026-09-02T10:00:00.000Z",
-        role: "STUDENT",
-        completedAssignmentsCount: 4,
-      },
-      {
-        userId: "student_priya",
-        username: "Priya Sharma (PEC ECE '25)",
-        avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=priyasharma",
-        elo: 1320,
-        enrolledAt: "2026-09-02T11:00:00.000Z",
-        role: "STUDENT",
-        completedAssignmentsCount: 3,
-      },
-      {
-        userId: "student_rohan",
-        username: "Rohan Verma (PEC ECE '26)",
-        avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=rohanv",
-        elo: 1285,
-        enrolledAt: "2026-09-03T09:00:00.000Z",
-        role: "STUDENT",
-        completedAssignmentsCount: 3,
-      },
-      {
-        userId: "student_kavya",
-        username: "Kavya Nair (PEC ECE '26)",
-        avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=kavyan",
-        elo: 1215,
-        enrolledAt: "2026-09-04T14:00:00.000Z",
-        role: "STUDENT",
-        completedAssignmentsCount: 2,
-      },
-    ],
+    students: [],
   },
   {
     code: "CS-210-SYSTEMS",
@@ -139,7 +102,7 @@ export const SEEDED_COHORTS: Array<Cohort & { assignments: CohortAssignment[]; s
     instructorName: "Prof. Divya Gupta (Systems & Networks Lab)",
     description: "Production SWE incident response: rate limiting algorithms, token buckets, memory management, and caching concurrency.",
     createdAt: "2026-09-01T08:00:00.000Z",
-    studentCount: 38,
+    studentCount: 0,
     assignmentsCount: 3,
     assignments: [
       {
@@ -173,35 +136,7 @@ export const SEEDED_COHORTS: Array<Cohort & { assignments: CohortAssignment[]; s
         createdAt: "2026-09-19T10:00:00.000Z",
       },
     ],
-    students: [
-      {
-        userId: "student_tanmay",
-        username: "Tanmay Joshi (PEC CS '25)",
-        avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=tanmayj",
-        elo: 1390,
-        enrolledAt: "2026-09-02T10:00:00.000Z",
-        role: "STUDENT",
-        completedAssignmentsCount: 3,
-      },
-      {
-        userId: "student_ananya",
-        username: "Ananya Sen (PEC CS '26)",
-        avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=ananyas",
-        elo: 1310,
-        enrolledAt: "2026-09-03T11:00:00.000Z",
-        role: "STUDENT",
-        completedAssignmentsCount: 2,
-      },
-      {
-        userId: "student_harsh",
-        username: "Harsh Patel (PEC CS '26)",
-        avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=harshp",
-        elo: 1260,
-        enrolledAt: "2026-09-04T12:00:00.000Z",
-        role: "STUDENT",
-        completedAssignmentsCount: 2,
-      },
-    ],
+    students: [],
   },
 ];
 

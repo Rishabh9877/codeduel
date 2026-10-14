@@ -58,16 +58,19 @@ const FALLBACK_HINTS = [
 ];
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userId = ((session.user as any).id || (session.user as any).sub) as string;
   const body = await req.json();
   const { matchId, challengeId, currentCode, language, activeFileName, practice, practiceTier } = body;
 
   const isSoloPractice = practice || matchId === "practice" || matchId?.startsWith("practice-");
+
+  const session = await getServerSession(authOptions);
+  if (!isSoloPractice && !session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userId = session?.user
+    ? (((session.user as any).id || (session.user as any).sub) as string)
+    : "guest_practice";
 
   let tierIndex = 0;
   let tierNumber = 1;
@@ -118,8 +121,8 @@ export async function POST(req: Request) {
     tierNumber = hintsUsed + 1;
   }
 
-  // Check subscription tier for hints beyond Tier 1
-  if (tierIndex > 0) {
+  // Check subscription tier for hints beyond Tier 1 (only for authenticated competitive matches)
+  if (tierIndex > 0 && !isSoloPractice && userId !== "guest_practice") {
     const subTier = await getUserSubscriptionTier(userId);
     if (subTier === "FREE") {
       return NextResponse.json(
@@ -152,15 +155,29 @@ ${currentCode?.trim() || "(empty — player hasn't edited anything yet)"}
 
 ${TIER_INSTRUCTIONS[tierIndex]}`;
 
+  // Smart Socratic fallback derived directly from the challenge's walkthrough
   let hint = FALLBACK_HINTS[tierIndex];
+  if (challenge?.walkthrough) {
+    if (tierIndex === 0 && challenge.walkthrough.rootCause) {
+      const firstSentence = challenge.walkthrough.rootCause.split(". ")[0];
+      hint = `Conceptual Nudge: Pay close attention to the core state boundary. In particular, consider: ${firstSentence}. How does this affect edge-case behavior?`;
+    } else if (tierIndex === 1 && challenge.walkthrough.commonMistakes?.length) {
+      hint = `Architectural Approach: Verify your calculation sequence step-by-step. Be careful to avoid: ${challenge.walkthrough.commonMistakes.slice(0, 2).join(", and ")}.`;
+    } else if (tierIndex === 2 && challenge.walkthrough.whyItMatters) {
+      hint = `Deep Insight: ${challenge.walkthrough.whyItMatters} Ensure pointer wrap-around and state updates maintain strict boundary conditions before returning.`;
+    }
+  }
 
   try {
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
     if (!GEMINI_API_KEY) {
-      console.error("[hint] GEMINI_API_KEY is not set — using fallback hint");
+      console.log("[hint] GEMINI_API_KEY not set — using curated Socratic hint");
     } else {
-      const candidateModels = ["gemini-3.5-flash", "gemini-3-flash-preview", "gemini-3.8-flash"];
+      const candidateModels = [
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+      ];
       let succeeded = false;
 
       for (const model of candidateModels) {
@@ -177,6 +194,7 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
                 temperature: 0.7,
               },
             }),
+            signal: AbortSignal.timeout(3500),
           });
 
           const data = await response.json();
@@ -186,16 +204,16 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
             break;
           }
         } catch (callErr) {
-          console.warn(`[hint] Model ${model} call error:`, callErr);
+          console.warn(`[hint] Model ${model} call error:`, (callErr as any)?.message || callErr);
         }
       }
 
       if (!succeeded) {
-        console.warn("[hint] All Gemini models unavailable or rate-limited; falling back to curated Socratic guidance.");
+        console.warn("[hint] Gemini API temporarily busy; served curated challenge-specific Socratic hint.");
       }
     }
   } catch (err) {
-    console.error("[hint] Network/parse error calling Gemini:", err);
+    console.error("[hint] Network error calling Gemini:", err);
   }
 
   hint = sanitizeHint(hint);

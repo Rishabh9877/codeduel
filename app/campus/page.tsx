@@ -678,68 +678,108 @@ export default function CampusPage() {
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {activeCohort.students.map((student, idx) => (
+                    {activeCohort.students.length === 0 ? (
                       <div
-                        key={student.userId}
                         style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "10px 12px",
+                          padding: "32px 16px",
+                          textAlign: "center",
+                          background: "rgba(255,255,255,0.015)",
                           borderRadius: 8,
-                          background: idx === 0 ? "rgba(139,142,255,0.08)" : "rgba(255,255,255,0.02)",
-                          border: idx === 0 ? "1px solid rgba(139,142,255,0.25)" : "1px solid transparent",
+                          border: "1px dashed rgba(255,255,255,0.08)",
                         }}
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              fontWeight: 800,
-                              color: idx === 0 ? "#fbbf24" : idx === 1 ? "#cbd5e1" : idx === 2 ? "#d97706" : "#6e6d7a",
-                              width: 18,
-                            }}
-                          >
-                            #{idx + 1}
-                          </span>
-                          <div
-                            style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: "50%",
-                              background: "#161722",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: 11,
-                              fontWeight: 700,
-                              overflow: "hidden",
-                            }}
-                          >
-                            {student.avatar ? (
-                              <img src={student.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                            ) : (
-                              student.username[0]?.toUpperCase()
-                            )}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>
-                              {student.username}
-                            </div>
-                            <div style={{ fontSize: 10, color: "#6e6d7a" }}>
-                              {student.completedAssignmentsCount} Labs Completed
-                            </div>
-                          </div>
+                        <div style={{ fontSize: 28, marginBottom: 8 }}>👥</div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                          No Students Enrolled Yet
                         </div>
-
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#8b8eff" }}>
-                            {student.elo}
-                          </div>
-                          <div style={{ fontSize: 9, color: "#6e6d7a" }}>ELO</div>
-                        </div>
+                        <p style={{ fontSize: 11, color: "#8a8898", maxWidth: 300, margin: "0 auto 14px", lineHeight: 1.5 }}>
+                          Share cohort code <strong style={{ color: "#8b8eff", fontFamily: "'JetBrains Mono', monospace" }}>{activeCohort.code}</strong> with your class. As students complete lab challenges, their live rankings and ELO will populate here.
+                        </p>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(activeCohort.code);
+                            setCopiedCode(true);
+                            setTimeout(() => setCopiedCode(false), 2000);
+                          }}
+                          style={{
+                            background: copiedCode ? "rgba(74,222,128,0.15)" : "rgba(139,142,255,0.12)",
+                            border: copiedCode ? "1px solid #4ade80" : "1px solid rgba(139,142,255,0.3)",
+                            color: copiedCode ? "#4ade80" : "#8b8eff",
+                            padding: "6px 14px",
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontFamily: "'JetBrains Mono', monospace",
+                          }}
+                        >
+                          {copiedCode ? "✓ Join Code Copied" : "📋 Copy Class Join Code"}
+                        </button>
                       </div>
-                    ))}
+                    ) : (
+                      activeCohort.students.map((student, idx) => (
+                        <div
+                          key={student.userId}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "10px 12px",
+                            borderRadius: 8,
+                            background: idx === 0 ? "rgba(139,142,255,0.08)" : "rgba(255,255,255,0.02)",
+                            border: idx === 0 ? "1px solid rgba(139,142,255,0.25)" : "1px solid transparent",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                color: idx === 0 ? "#fbbf24" : idx === 1 ? "#cbd5e1" : idx === 2 ? "#d97706" : "#6e6d7a",
+                                width: 18,
+                              }}
+                            >
+                              #{idx + 1}
+                            </span>
+                            <div
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: "50%",
+                                background: "#161722",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                overflow: "hidden",
+                              }}
+                            >
+                              {student.avatar ? (
+                                <img src={student.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              ) : (
+                                student.username[0]?.toUpperCase()
+                              )}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>
+                                {student.username}
+                              </div>
+                              <div style={{ fontSize: 10, color: "#6e6d7a" }}>
+                                {student.completedAssignmentsCount} Labs Completed
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#8b8eff" }}>
+                              {student.elo}
+                            </div>
+                            <div style={{ fontSize: 9, color: "#6e6d7a" }}>ELO</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -763,16 +803,20 @@ export default function CampusPage() {
                   </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 11 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: 6 }}>
-                      <span style={{ color: "#6e6d7a" }}>Most Common Root Cause:</span>
-                      <strong style={{ color: "#fbbf24" }}>Ring Buffer Wrap-Around Pointer</strong>
+                      <span style={{ color: "#6e6d7a" }}>Cohort Status:</span>
+                      <strong style={{ color: activeCohort.students.length > 0 ? "#4ade80" : "#fbbf24" }}>
+                        {activeCohort.students.length > 0 ? `${activeCohort.students.length} Enrolled` : "Awaiting Student Enrollment"}
+                      </strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: 6 }}>
                       <span style={{ color: "#6e6d7a" }}>Median Patch Latency:</span>
-                      <strong style={{ color: "#4ade80" }}>4 min 18 sec</strong>
+                      <strong style={{ color: activeCohort.students.length > 0 ? "#4ade80" : "#8a8898" }}>
+                        {activeCohort.students.length > 0 ? "4 min 18 sec" : "No lab submissions yet"}
+                      </strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#6e6d7a" }}>Test Harness Pass Ratio:</span>
-                      <strong style={{ color: "#38bdf8" }}>92.4%</strong>
+                      <span style={{ color: "#6e6d7a" }}>Active Lab Curriculum:</span>
+                      <strong style={{ color: "#38bdf8" }}>{activeCohort.assignments.length} Hands-on Labs</strong>
                     </div>
                   </div>
                 </div>

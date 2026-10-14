@@ -824,10 +824,10 @@ export default function LandingPage() {
               </thead>
               <tbody>
                 {[
-                  { p1: "RD", p2: "BOT", names: "Rishabh vs CodeSentinel AI (Bot)", prob: "PR #108: Token Bucket Rate Limiter", track: "Cloud SWE · TS", result: "Win +16 ELO", win: true },
-                  { p1: "NP", p2: "AD", names: "Tanmay_J vs Ananya_S", prob: "Issue #44: UART Ring Buffer Telemetry", track: "Embedded · C", result: "Win +18 ELO", win: true },
-                  { p1: "LK", p2: "SC", names: "Linus_KernelDev vs Silicon_Carmack", prob: "Issue #89: Cortex-M0 Unaligned HardFault", track: "Embedded · C", result: "Win +19 ELO", win: true },
-                  { p1: "CA", p2: "TA", names: "CloudNative_Ace vs Tokio_AsyncMaster", prob: "PR #212: Exponential Retry Jitter", track: "Cloud SWE · TS", result: "Win +17 ELO", win: true },
+                  { p1: "RD", p2: "BOT", names: "Rishabh9877 vs CodeSentinel AI (Bot)", prob: "PR #108: Token Bucket Rate Limiter", track: "Cloud SWE · TS", result: "Win +16 ELO", win: true },
+                  { p1: "VA", p2: "BOT", names: "vivaanarora vs CodeSentinel AI (Bot)", prob: "Issue #44: UART Ring Buffer Telemetry", track: "Embedded · C", result: "Win +18 ELO", win: true },
+                  { p1: "RD", p2: "VA", names: "Rishabh9877 vs vivaanarora", prob: "Issue #89: Cortex-M0 Unaligned HardFault", track: "Embedded · C", result: "Win +19 ELO", win: true },
+                  { p1: "G1", p2: "BOT", names: "Guest_Alpha vs CodeSentinel AI (Bot)", prob: "PR #212: Exponential Retry Jitter", track: "Cloud SWE · TS", result: "Win +17 ELO", win: true },
                 ].map((row, i) => (
                   <tr key={i}>
                     <td>
