@@ -505,7 +505,7 @@ export default function PricingPage() {
                     <input
                       required
                       type="text"
-                      placeholder="Prof. Arun Kumar"
+                      placeholder="Prof. Vikram Malhotra"
                       value={campusForm.name}
                       onChange={(e) => setCampusForm({ ...campusForm, name: e.target.value })}
                       style={{
@@ -529,7 +529,7 @@ export default function PricingPage() {
                     <input
                       required
                       type="email"
-                      placeholder="arun@pec.edu.in"
+                      placeholder="malhotra@pec.edu.in"
                       value={campusForm.email}
                       onChange={(e) => setCampusForm({ ...campusForm, email: e.target.value })}
                       style={{

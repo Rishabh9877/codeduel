@@ -103,7 +103,7 @@ export default function ContactPage() {
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="e.g. Dr. Arun Kumar"
+                    placeholder="e.g. Prof. Vikram Malhotra"
                     style={{
                       width: "100%",
                       background: "rgba(0,0,0,0.4)",
