@@ -32,22 +32,29 @@ Be concise, technical, warm, and encouraging.
 Respond with plain text only — no markdown headers, no bullet points, and at most short inline code keywords if strictly necessary.`;
 
 // Hard guardrail: Coach NEVER gives code solutions.
-// If the LLM generates a codeblock longer than 6 lines, the server replaces it.
-function sanitizeHint(text: string): string {
-  const codeBlockRegex = /```[\s\S]*?```/g;
-  let match;
-  let hasLongCodeBlock = false;
-  while ((match = codeBlockRegex.exec(text)) !== null) {
-    const lines = match[0].split("\n");
-    if (lines.length > 6) {
-      hasLongCodeBlock = true;
-      break;
+// Strips accidental multi-line code blocks from Gemini responses to enforce Socratic pedagogy.
+function sanitizeHint(text: string, fallback?: string): string {
+  if (!text) return fallback || "";
+
+  // 1. Strip all multi-line fenced code blocks
+  let cleaned = text.replace(/```[a-zA-Z0-9_-]*\n[\s\S]*?\n```/g, () => {
+    return "[Socratic Lead Guidance: Trace the state transitions and pointer arithmetic directly in your logic rather than copying pre-written blocks.]";
+  });
+
+  // 2. Also strip any remaining triple backtick blocks containing newlines
+  cleaned = cleaned.replace(/```[\s\S]*?```/g, (match) => {
+    if (match.includes("\n")) {
+      return "[Focus on isolating the root-cause assertion failure.]";
     }
+    return match;
+  });
+
+  // 3. Fallback if the response was entirely a code block
+  if (cleaned.trim().length < 15 && fallback) {
+    return fallback;
   }
-  if (hasLongCodeBlock) {
-    return "The coach nudges you in the right direction, but won't write the code for you: focus on understanding how state updates between calls, and trace the edge case step by step.";
-  }
-  return text;
+
+  return cleaned.trim();
 }
 
 // Per-tier fallbacks used only when the Gemini API is unavailable
@@ -57,7 +64,26 @@ const FALLBACK_HINTS = [
   "Verify boundary wrap-around masking and state clamping before decrementing or incrementing pointers.",
 ];
 
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string, limit = 12, windowMs = 60000): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= limit) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+
 export async function POST(req: Request) {
+  const forwarded = req.headers.get("x-forwarded-for");
+  const clientIp = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+
   const body = await req.json();
   const { matchId, challengeId, currentCode, language, activeFileName, practice, practiceTier } = body;
 
@@ -71,6 +97,15 @@ export async function POST(req: Request) {
   const userId = session?.user
     ? (((session.user as any).id || (session.user as any).sub) as string)
     : "guest_practice";
+
+  // Rate limiting guard
+  const rateKey = `hint_${userId}_${clientIp}`;
+  if (!checkRateLimit(rateKey, 15, 60000)) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded: You are requesting hints too rapidly. Please pause for 60 seconds." },
+      { status: 429 }
+    );
+  }
 
   let tierIndex = 0;
   let tierNumber = 1;
@@ -140,17 +175,20 @@ export async function POST(req: Request) {
   const title = challenge?.title || body.problemTitle || "Production Bug";
   const description = challenge?.ticketMarkdown || body.problemDescription || "Fix the bug";
 
+  const safeFileName = typeof activeFileName === "string" ? activeFileName.slice(0, 100).replace(/[^\w.-]/g, "") : "main";
+  const safeCurrentCode = typeof currentCode === "string" ? currentCode.slice(0, 12000).trim() : "";
+
   const userMessage = `Challenge: ${title}
 Track: ${challenge?.track || "PRODUCTION_SWE"}
 Repository: ${challenge?.repoContext || "production"}
-File Being Edited: ${activeFileName || "main"}
+File Being Edited: ${safeFileName}
 
 Bug Ticket Description:
 ${description}
 
 Developer's Current Patch (${language || "code"}):
 \`\`\`${language || "text"}
-${currentCode?.trim() || "(empty — player hasn't edited anything yet)"}
+${safeCurrentCode || "(empty — player hasn't edited anything yet)"}
 \`\`\`
 
 ${TIER_INSTRUCTIONS[tierIndex]}`;
@@ -175,8 +213,9 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
       console.log("[hint] GEMINI_API_KEY not set — using curated Socratic hint");
     } else {
       const candidateModels = [
+        "gemini-flash-lite-latest",
+        "gemini-3.5-flash-lite",
         "gemini-3.8-flash",
-        "gemini-flash-latest",
       ];
       let succeeded = false;
 
@@ -190,16 +229,16 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
               systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
               contents: [{ role: "user", parts: [{ text: userMessage }] }],
               generationConfig: {
-                maxOutputTokens: 300,
+                maxOutputTokens: 400,
                 temperature: 0.7,
               },
             }),
-            signal: AbortSignal.timeout(3500),
+            signal: AbortSignal.timeout(6000),
           });
 
           const data = await response.json();
           if (response.ok && !data.error && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-            hint = sanitizeHint(data.candidates[0].content.parts[0].text.trim());
+            hint = sanitizeHint(data.candidates[0].content.parts[0].text.trim(), hint);
             succeeded = true;
             break;
           }
@@ -216,7 +255,7 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
     console.error("[hint] Network error calling Gemini:", err);
   }
 
-  hint = sanitizeHint(hint);
+  hint = sanitizeHint(hint, FALLBACK_HINTS[tierIndex]);
 
   // If match mode, increment hintsUsed in DynamoDB
   const newHintsUsed = hintsUsed + 1;

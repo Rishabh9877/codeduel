@@ -12,8 +12,9 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const track = url.searchParams.get('track') as 'PRODUCTION_SWE' | 'EMBEDDED_SYSTEMS' | null;
+    const mode = url.searchParams.get('mode') as 'solo' | 'duo' | null;
 
-    const challenges = getAllChallenges(track || undefined).map((c) => ({
+    const challenges = getAllChallenges(track || undefined, mode || undefined).map((c) => ({
       id: c.id,
       track: c.track,
       language: c.language,
@@ -25,6 +26,7 @@ export async function GET(req: Request) {
       difficulty: c.difficulty,
       estimatedMinutes: c.estimatedMinutes,
       skills: c.skills,
+      category: c.category || 'both',
       hiddenTestsCount: c.hiddenTestsCount,
       hasHardwareSimulation: !!c.hardwareContext,
     }));

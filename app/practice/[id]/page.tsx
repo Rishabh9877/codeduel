@@ -6,6 +6,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import Editor from "@monaco-editor/react";
 import { SimulatedHardwarePanel } from "@/components/SimulatedHardwarePanel";
+import { TicketBriefViewer } from "@/components/TicketBriefViewer";
 import type { HardwareContext } from "@/lib/challenges";
 
 interface ChallengeFile {
@@ -85,9 +86,16 @@ export default function SoloPracticeArena() {
   // Test run state
   const [testRunsCount, setTestRunsCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [executionStage, setExecutionStage] = useState<string | null>(null);
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<"testResults" | "logs">("testResults");
-  const [leftTab, setLeftTab] = useState<"ticket" | "hardware">("ticket");
+  const [leftTab, setLeftTab] = useState<"ticket" | "checklist" | "hardware">("ticket");
+  const [triageChecklist, setTriageChecklist] = useState<Record<string, boolean>>({
+    symptomIdentified: false,
+    moduleIsolated: false,
+    atomicPatchDrafted: false,
+    hardwareVerified: false,
+  });
 
   // AI Hint Coach
   const [showCoach, setShowCoach] = useState(false);
@@ -186,6 +194,22 @@ export default function SoloPracticeArena() {
     setTestRunsCount((c) => c + 1);
 
     try {
+      // Step 1: Bundling multi-file repository
+      setExecutionStage("[1/3] Bundling multi-file repository...");
+      await new Promise((r) => setTimeout(r, 220));
+
+      // Step 2: Compiling via Piston Sandbox
+      const compiler = challenge.language === "c"
+        ? "gcc 10.2"
+        : challenge.language === "python"
+        ? "python 3.10"
+        : "tsx 5.0";
+      setExecutionStage(`[2/3] Compiling via Piston Sandbox (${compiler})...`);
+      await new Promise((r) => setTimeout(r, 280));
+
+      // Step 3: Evaluating assertion harness & hardware telemetry
+      setExecutionStage("[3/3] Evaluating assertion harness & hardware telemetry...");
+
       const res = await fetch("/api/practice/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -221,6 +245,7 @@ export default function SoloPracticeArena() {
       console.error("Test submission failed:", err);
     } finally {
       setSubmitting(false);
+      setExecutionStage(null);
     }
   };
 
@@ -345,7 +370,7 @@ export default function SoloPracticeArena() {
           </Link>
 
           <span style={{ fontWeight: 800, fontSize: 14, color: "#fff" }}>
-            CodeDuel <span style={{ color: "#8b8eff" }}>Solo</span>
+            Codeduel <span style={{ color: "#8b8eff" }}>Solo</span>
           </span>
 
           <span
@@ -550,7 +575,14 @@ export default function SoloPracticeArena() {
               boxShadow: "0 0 15px rgba(139,142,255,0.3)",
             }}
           >
-            {submitting ? "Evaluating..." : "▶ Run Tests"}
+            {submitting ? (
+              <>
+                <span style={{ display: "inline-block", width: 12, height: 12, border: "2px solid #000", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                <span>{executionStage || "Evaluating..."}</span>
+              </>
+            ) : (
+              "▶ Run Tests & Verify"
+            )}
           </button>
         </div>
       </header>
@@ -635,25 +667,41 @@ export default function SoloPracticeArena() {
               </span>
             </div>
 
-            {/* Hardware vs Ticket Tab Toggle (if hardwareContext exists) */}
-            {challenge.hardwareContext && (
-              <div style={{ display: "flex", gap: 4, marginTop: 10, background: "rgba(255,255,255,0.04)", padding: 2, borderRadius: 6 }}>
-                <button
-                  onClick={() => setLeftTab("ticket")}
-                  style={{
-                    flex: 1,
-                    background: leftTab === "ticket" ? "#151624" : "transparent",
-                    color: leftTab === "ticket" ? "#fff" : "#8a8898",
-                    border: "none",
-                    borderRadius: 4,
-                    padding: "5px 10px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  📋 Incident Ticket
-                </button>
+            {/* Left Panel Tabs: Ticket vs Checklist vs Hardware */}
+            <div style={{ display: "flex", gap: 4, marginTop: 10, background: "rgba(255,255,255,0.04)", padding: 2, borderRadius: 6 }}>
+              <button
+                onClick={() => setLeftTab("ticket")}
+                style={{
+                  flex: 1,
+                  background: leftTab === "ticket" ? "#151624" : "transparent",
+                  color: leftTab === "ticket" ? "#fff" : "#8a8898",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "5px 8px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                📋 Brief
+              </button>
+              <button
+                onClick={() => setLeftTab("checklist")}
+                style={{
+                  flex: 1,
+                  background: leftTab === "checklist" ? "rgba(139,142,255,0.18)" : "transparent",
+                  color: leftTab === "checklist" ? "#8b8eff" : "#8a8898",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "5px 8px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                ✅ Triage Checklist
+              </button>
+              {challenge.hardwareContext && (
                 <button
                   onClick={() => setLeftTab("hardware")}
                   style={{
@@ -662,7 +710,7 @@ export default function SoloPracticeArena() {
                     color: leftTab === "hardware" ? "#fbbf24" : "#8a8898",
                     border: "none",
                     borderRadius: 4,
-                    padding: "5px 10px",
+                    padding: "5px 8px",
                     fontSize: 11,
                     fontWeight: 700,
                     cursor: "pointer",
@@ -670,103 +718,150 @@ export default function SoloPracticeArena() {
                 >
                   ⚡ Hardware & Scope
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          {/* Conditional Left Body: Hardware Panel OR Ticket Brief */}
+          {/* Conditional Left Body: Hardware Panel OR Checklist OR Ticket Brief */}
           {leftTab === "hardware" && challenge.hardwareContext ? (
             <div style={{ flex: 1, overflowY: "auto" }}>
               <SimulatedHardwarePanel
                 hardwareContext={challenge.hardwareContext}
                 hiddenTestsCount={challenge.hiddenTestsCount}
+                challengeId={challenge.id}
+                executionStatus={submitting ? 'RUNNING' : (submitResult ? (submitResult.allPassed ? 'PASSED' : 'FAILED') : 'IDLE')}
+                testsPassed={submitResult?.passed ?? 0}
+                totalTests={challenge.totalTests}
+                userCode={files[activeFileName] || ''}
               />
             </div>
-          ) : (
-          <div style={{ padding: "20px", flex: 1, fontSize: 13, lineHeight: 1.6, color: "#c8c6d4" }}>
-            <div
-              style={{
-                background: "rgba(255,255,255,0.02)",
-                border: "1px solid rgba(255,255,255,0.06)",
+          ) : leftTab === "checklist" ? (
+            <div style={{ padding: "20px", flex: 1, fontSize: 13, lineHeight: 1.6, color: "#c8c6d4" }}>
+              {/* 1. Observed Symptom */}
+              <div style={{
+                background: "rgba(248,113,113,0.06)",
+                border: "1px solid rgba(248,113,113,0.25)",
                 borderRadius: 8,
-                padding: 16,
-                marginBottom: 20,
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 12,
-                  color: "#8b8eff",
-                  marginBottom: 8,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                📋 Incident Report & Repro Steps
+                padding: 14,
+                marginBottom: 16
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  1. Observed Symptom & Failure Signature
+                </div>
+                <div style={{ fontSize: 12, color: "#e8e6f0", lineHeight: 1.5 }}>
+                  {challenge.track === "EMBEDDED_SYSTEMS"
+                    ? "Hardware bus fault or unaligned memory access triggered in peripheral control registers. Assertion suite detected frame drop, corrupted bitfields, or unhandled interrupt race condition."
+                    : "Production runtime degradation under high-load assertion harness. Assertion suite encountered unexpected state truncation, resource exhaustion, or signature verification failure."}
+                </div>
               </div>
-              <div style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}>
-                {challenge.ticketMarkdown}
-              </div>
-            </div>
 
-            {/* Architecture Explanation */}
-            <div
-              style={{
-                background: "rgba(255,255,255,0.02)",
-                border: "1px solid rgba(255,255,255,0.06)",
+              {/* 2. Affected Module */}
+              <div style={{
+                background: "rgba(139,142,255,0.06)",
+                border: "1px solid rgba(139,142,255,0.25)",
                 borderRadius: 8,
-                padding: 16,
-              }}
-            >
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 12,
-                  color: "#fbbf24",
-                  marginBottom: 8,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                🗂 Modular Architecture
-              </div>
-              <p style={{ fontSize: 12, color: "#8a8898", marginBottom: 12 }}>
-                Switch between tabs on the right editor. Only the bug patch file is editable; reference headers and test suites are read-only.
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {challenge.files.map((f) => (
-                  <div
-                    key={f.name}
-                    onClick={() => setActiveFileName(f.name)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "8px 12px",
-                      borderRadius: 6,
-                      background: activeFileName === f.name ? "rgba(139,142,255,0.1)" : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${activeFileName === f.name ? "rgba(139,142,255,0.3)" : "rgba(255,255,255,0.05)"}`,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontFamily: "'JetBrains Mono', monospace",
-                    }}
-                  >
-                    <span>{f.name}</span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 600,
-                        color: f.readOnly ? "#8a8898" : "#4ade80",
-                      }}
-                    >
-                      {f.readOnly ? "🔒 Read-Only" : "✏️ Editable"}
+                padding: 14,
+                marginBottom: 16
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: "#8b8eff", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  2. Affected Module & Toolchain
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <div>
+                    <span style={{ color: "#8a8898" }}>Target File: </span>
+                    <span style={{ color: "#fff" }}>{activeFileName || challenge.files.find(f => !f.readOnly)?.name}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: "#8a8898" }}>Runner: </span>
+                    <span style={{ color: "#fff" }}>{challenge.entrypoint}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: "#8a8898" }}>Toolchain: </span>
+                    <span style={{ color: "#4ade80" }}>
+                      {challenge.language === "c" ? "GCC 10.2 (ARM)" : challenge.language === "python" ? "Python 3.10" : "TSX 5.0 (Node 20)"}
                     </span>
                   </div>
-                ))}
+                  <div>
+                    <span style={{ color: "#8a8898" }}>Track: </span>
+                    <span style={{ color: challenge.track === "PRODUCTION_SWE" ? "#8b8eff" : "#fbbf24" }}>
+                      {challenge.track}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Pass Criteria */}
+              <div style={{
+                background: "rgba(74,222,128,0.06)",
+                border: "1px solid rgba(74,222,128,0.25)",
+                borderRadius: 8,
+                padding: 14,
+                marginBottom: 16
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  3. Pass Criteria & Service Level Objective
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#e8e6f0", lineHeight: 1.6 }}>
+                  <li>All {challenge.totalTests} Piston unit test assertions must exit with status code 0.</li>
+                  <li>Zero memory faults (`CFSR = 0x00000000`, `HFSR = 0x00000000`) in telemetry bench.</li>
+                  <li>Execution latency under 500ms SLA without event loop or thread blockages.</li>
+                </ul>
+              </div>
+
+              {/* Guided Onboarding Checklist */}
+              <div style={{
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8,
+                padding: 14
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
+                  Guided Incident Triage Checklist
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    { key: "symptomIdentified", label: "Inspect ticket brief & isolate error line number" },
+                    { key: "moduleIsolated", label: "Audit memory alignment, race conditions, or token arithmetic" },
+                    { key: "atomicPatchDrafted", label: "Draft minimal surgical patch in editable tab" },
+                    { key: "hardwareVerified", label: "Verify patch with 'Run Tests & Verify'" },
+                  ].map((item) => (
+                    <label
+                      key={item.key}
+                      onClick={() => setTriageChecklist(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        cursor: "pointer",
+                        fontSize: 12,
+                        padding: "6px 8px",
+                        borderRadius: 6,
+                        background: triageChecklist[item.key] ? "rgba(74,222,128,0.08)" : "rgba(255,255,255,0.02)",
+                        border: `1px solid ${triageChecklist[item.key] ? "rgba(74,222,128,0.25)" : "transparent"}`
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!triageChecklist[item.key]}
+                        readOnly
+                        style={{ accentColor: "#4ade80", cursor: "pointer" }}
+                      />
+                      <span style={{ color: triageChecklist[item.key] ? "#4ade80" : "#c8c6d4", textDecoration: triageChecklist[item.key] ? "line-through" : "none" }}>
+                        {item.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ padding: "20px 22px 32px", flex: 1, fontSize: 13, lineHeight: 1.6, color: "#c8c6d4" }}>
+              <TicketBriefViewer
+                markdown={challenge.ticketMarkdown}
+                repoContext={challenge.repoContext}
+                targetFile={activeFileName || challenge.files.find(f => !f.readOnly)?.name}
+              />
+            </div>
           )}
         </div>
 

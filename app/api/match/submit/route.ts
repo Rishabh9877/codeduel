@@ -5,7 +5,7 @@ import { GetCommand, UpdateCommand, PutCommand, TransactWriteCommand } from "@aw
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { getChallengeById } from "@/lib/challenges";
 import { executeChallenge } from "@/lib/challengeExecutor";
-import { calcElo } from "@/lib/elo";
+import { calcElo, STARTING_ELO } from "@/lib/elo";
 
 export async function POST(req: Request) {
   try {
@@ -137,8 +137,8 @@ export async function POST(req: Request) {
         dynamo.send(new GetCommand({ TableName: TABLE, Key: { PK: `USER#${loser.userId}`, SK: "PROFILE" } }))
       ]);
 
-      const liveWinnerElo = winnerProfileResult.Item?.elo ?? 1200;
-      const liveLoserElo = loserProfileResult.Item?.elo ?? 1200;
+      const liveWinnerElo = winnerProfileResult.Item?.elo ?? STARTING_ELO;
+      const liveLoserElo = loserProfileResult.Item?.elo ?? STARTING_ELO;
 
       const newWinnerElo = calcElo(liveWinnerElo, liveLoserElo, true);
       const newLoserElo = calcElo(liveLoserElo, liveWinnerElo, false);
@@ -259,6 +259,13 @@ export async function POST(req: Request) {
         won: true,
         eloChange: newWinnerElo - liveWinnerElo,
         newElo: newWinnerElo,
+        walkthrough: challenge.walkthrough ? {
+          rootCause: challenge.walkthrough.rootCause,
+          buggyVsFixedDiff: challenge.walkthrough.buggyVsFixedDiff,
+          whyItMatters: challenge.walkthrough.whyItMatters,
+          commonMistakes: challenge.walkthrough.commonMistakes,
+        } : undefined,
+        canonicalSolution: challenge.canonicalSolution || challenge.walkthrough?.buggyVsFixedDiff,
       });
     }
 

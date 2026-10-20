@@ -1,8 +1,26 @@
 import { NextResponse } from "next/server";
 import { getChallengeById } from "@/lib/challenges";
 
+const walkthroughRateLimit = new Map<string, { count: number; resetAt: number }>();
+
 export async function POST(req: Request) {
   try {
+    const forwarded = req.headers.get("x-forwarded-for");
+    const clientIp = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+
+    const now = Date.now();
+    const entry = walkthroughRateLimit.get(clientIp);
+    if (!entry || now > entry.resetAt) {
+      walkthroughRateLimit.set(clientIp, { count: 1, resetAt: now + 60000 });
+    } else if (entry.count >= 10) {
+      return NextResponse.json(
+        { error: "Too many walkthrough unlock requests. Please wait a minute." },
+        { status: 429 }
+      );
+    } else {
+      entry.count++;
+    }
+
     const body = await req.json();
     const { challengeId, attemptsCount = 0, secondsSpent = 0 } = body;
 

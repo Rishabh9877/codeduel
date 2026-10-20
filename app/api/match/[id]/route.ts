@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { GetCommand, UpdateCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { getChallengeById } from "@/lib/challenges";
-import { calcElo } from "@/lib/elo";
+import { calcElo, getBotSimulationParams, STARTING_ELO } from "@/lib/elo";
 
 export const dynamic = "force-dynamic";
 
@@ -64,9 +64,15 @@ export async function GET(
       const challengeDef = getChallengeById(match.challengeId);
       const totalTests = challengeDef?.totalTests ?? 3;
       const elapsedMs = now - (match.startedAt ?? now);
+      const humanRole = botRole === "player1" ? "player2" : "player1";
+      const humanElo = Number(match[humanRole]?.elo ?? STARTING_ELO);
 
-      // Progressive simulation: tests pass sequentially over 40 seconds
-      const simulatedPassed = Math.min(totalTests, Math.floor((elapsedMs / 40000) * totalTests));
+      // Calibrate bot parameters dynamically to the human's bracket
+      const botParams = getBotSimulationParams(humanElo, totalTests);
+
+      // Progressive simulation: tests pass sequentially based on calibrated intervals
+      const timeBasedPasses = Math.floor(elapsedMs / botParams.testIntervalMs);
+      const simulatedPassed = Math.min(botParams.maxPassableBeforeSolve, timeBasedPasses);
 
       if (simulatedPassed > (match[botRole].testsPassed ?? 0)) {
         match[botRole].testsPassed = simulatedPassed;
@@ -84,10 +90,9 @@ export async function GET(
         })).catch(() => {});
       }
 
-      // If 40 seconds elapsed, bot solves everything and wins
-      if (elapsedMs >= 40000 && match.status === "active") {
+      // If calibrated solve duration has elapsed AND bracket allows bot auto-win
+      if (botParams.autoWinAllowed && elapsedMs >= botParams.solveDurationMs && match.status === "active") {
         const botId = match[botRole].userId;
-        const humanRole = botRole === "player1" ? "player2" : "player1";
         const humanId = match[humanRole].userId;
 
         match.status = "finished";
@@ -103,8 +108,8 @@ export async function GET(
           Key: { PK: `USER#${humanId}`, SK: "PROFILE" }
         })).catch(() => ({ Item: null }));
 
-        const liveHumanElo = Number(humanProfileRes.Item?.elo ?? match[humanRole].elo ?? 1200);
-        const liveBotElo = Number(match[botRole].elo ?? 1200);
+        const liveHumanElo = Number(humanProfileRes.Item?.elo ?? match[humanRole].elo ?? STARTING_ELO);
+        const liveBotElo = Number(match[botRole].elo ?? STARTING_ELO);
 
         const newBotElo = calcElo(liveBotElo, liveHumanElo, true);
         const newHumanElo = calcElo(liveHumanElo, liveBotElo, false);
@@ -300,6 +305,10 @@ export async function GET(
       files: challenge.files,
       entrypoint: challenge.entrypoint,
       totalTests: challenge.totalTests,
+      hardwareContext: challenge.hardwareContext,
+      hiddenTestsCount: challenge.hiddenTestsCount,
+      // SECURITY: Only reveal walkthrough if match is finalized to prevent live duel cheating
+      walkthrough: match.status === "finished" ? challenge.walkthrough : null,
     },
     myRole,
   }, {

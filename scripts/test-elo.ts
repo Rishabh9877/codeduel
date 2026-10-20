@@ -16,7 +16,7 @@ function assert(condition: boolean, msg: string) {
 }
 
 console.log("=================================================");
-console.log("RUNNING CODEDUEL ELO UNIT TEST SUITE");
+console.log("RUNNING Codeduel ELO UNIT TEST SUITE");
 console.log("=================================================\n");
 
 // Test 1: Equal Ratings Expected Score

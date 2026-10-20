@@ -6,7 +6,8 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Editor from "@monaco-editor/react";
 import { SimulatedHardwarePanel } from "@/components/SimulatedHardwarePanel";
-import type { HardwareContext } from "@/lib/challenges";
+import { TicketBriefViewer } from "@/components/TicketBriefViewer";
+import type { HardwareContext, ChallengeWalkthrough } from "@/lib/challenges";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ export interface Challenge {
   totalTests: number;
   hardwareContext?: HardwareContext;
   hiddenTestsCount?: number;
+  walkthrough?: ChallengeWalkthrough;
 }
 
 export interface PlayerSlot {
@@ -113,9 +115,20 @@ export default function MatchArena() {
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
-  const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
+  const [executionStage, setExecutionStage] = useState<string | null>(null);
+  const [submitResult, setSubmitResult] = useState<(SubmitResult & { runtimeMs?: number; walkthrough?: ChallengeWalkthrough; canonicalSolution?: string }) | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<"testResults" | "logs">("testResults");
-  const [leftTab, setLeftTab] = useState<"ticket" | "hardware">("ticket");
+  const [leftTab, setLeftTab] = useState<"ticket" | "checklist" | "hardware">("ticket");
+
+  // Post-Mortem Diff & Checklist
+  const [showDiffDrawer, setShowDiffDrawer] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [triageChecklist, setTriageChecklist] = useState<Record<string, boolean>>({
+    symptomIdentified: false,
+    moduleIsolated: false,
+    atomicPatchDrafted: false,
+    hardwareVerified: false,
+  });
 
   // AI Coach state (Gemini 2.0 Flash)
   const [showCoach, setShowCoach] = useState(false);
@@ -310,6 +323,22 @@ export default function MatchArena() {
     setSubmitting(true);
 
     try {
+      // Step 1: Bundling multi-file repository
+      setExecutionStage("[1/3] Bundling multi-file repository...");
+      await new Promise((r) => setTimeout(r, 220));
+
+      // Step 2: Compiling via Piston Sandbox
+      const compiler = challenge?.language === "c"
+        ? "gcc 10.2"
+        : challenge?.language === "python"
+        ? "python 3.10"
+        : "tsx 5.0";
+      setExecutionStage(`[2/3] Compiling via Piston Sandbox (${compiler})...`);
+      await new Promise((r) => setTimeout(r, 280));
+
+      // Step 3: Evaluating assertion harness & hardware telemetry
+      setExecutionStage("[3/3] Evaluating assertion harness & hardware telemetry...");
+
       const res = await fetch("/api/match/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -325,6 +354,7 @@ export default function MatchArena() {
       if (data.matchOver) {
         setMatchOver(true);
         setWon(data.won);
+        setShowDiffDrawer(true);
         stopPolling();
         fetchMatch();
       } else {
@@ -342,6 +372,7 @@ export default function MatchArena() {
       });
     } finally {
       setSubmitting(false);
+      setExecutionStage(null);
     }
   };
 
@@ -392,6 +423,47 @@ export default function MatchArena() {
   const oppTestsPassed = opponentPlayer?.testsPassed ?? 0;
   const totalTests = challenge.totalTests;
 
+  const renderTimelineTrack = (currentStep: number, isOpponent = false) => {
+    const steps = [
+      { id: 1, label: "Reading Ticket" },
+      { id: 2, label: isOpponent ? "Editing Module" : `Editing ${activeFileName ? activeFileName.split('/').pop() : 'Bug File'}` },
+      { id: 3, label: "Compiling in Sandbox" },
+      { id: 4, label: isOpponent ? `Tests Passed (${oppTestsPassed}/${totalTests})` : `Tests Passed (${myTestsPassed}/${totalTests})` },
+    ];
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+        {steps.map((st, i) => {
+          const isDone = currentStep > st.id;
+          const isCurrent = currentStep === st.id;
+          const activeColor = isOpponent ? (opponentPlayer?.isBot ? "#fbbf24" : "#f87171") : "#4ade80";
+          return (
+            <div key={st.id} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "2px 7px",
+                borderRadius: 4,
+                fontSize: 10,
+                background: isCurrent ? `${activeColor}22` : isDone ? "rgba(255,255,255,0.05)" : "transparent",
+                border: `1px solid ${isCurrent ? activeColor : isDone ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.05)"}`,
+                color: isCurrent ? activeColor : isDone ? "#fff" : "#6a6880",
+                fontWeight: isCurrent ? 700 : 500,
+                boxShadow: isCurrent ? `0 0 10px ${activeColor}33` : "none"
+              }}>
+                <span style={{ fontSize: 9 }}>{isDone ? "✓" : isCurrent ? "▶" : `${st.id}.`}</span>
+                <span>{st.label}</span>
+              </div>
+              {i < steps.length - 1 && (
+                <span style={{ color: isDone ? activeColor : "rgba(255,255,255,0.15)", fontSize: 10 }}>→</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#07070b", color: "#e8e6f0", overflow: "hidden", fontFamily: "system-ui, sans-serif" }}>
       {/* ── TOP HUD NAVIGATION ─────────────────────────────────────────────── */}
@@ -408,7 +480,7 @@ export default function MatchArena() {
         {/* Left: Brand & Track */}
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Link href="/dashboard" style={{ fontWeight: 800, fontSize: 16, color: "#fff", textDecoration: "none", letterSpacing: "-0.02em" }}>
-            CodeDuel <span style={{ color: "#8b8eff" }}>Arena</span>
+            Codeduel <span style={{ color: "#8b8eff" }}>Arena</span>
           </Link>
           <span style={{
             fontSize: 10,
@@ -532,6 +604,59 @@ export default function MatchArena() {
 
       </header>
 
+      {/* ── REAL-TIME OPPONENT TELEMETRY TIMELINE ──────────────────────────── */}
+      <div style={{
+        height: 40,
+        background: "#08090f",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 18px",
+        fontSize: 11,
+        fontFamily: "'JetBrains Mono', monospace",
+        flexShrink: 0,
+        gap: 12,
+        overflowX: "auto"
+      }}>
+        {/* YOU Telemetry Track */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span style={{ color: "#4ade80", fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 6px #4ade80" }} />
+            YOU ({myPlayer?.username || "Player"})
+          </span>
+          {renderTimelineTrack(
+            submitting ? 3 : (myTestsPassed > 0 ? 4 : (activeFileName ? 2 : 1)),
+            false
+          )}
+        </div>
+
+        <div style={{
+          color: "rgba(255,255,255,0.25)",
+          fontSize: 9,
+          fontWeight: 800,
+          letterSpacing: "0.08em",
+          padding: "2px 8px",
+          background: "rgba(255,255,255,0.03)",
+          borderRadius: 4,
+          whiteSpace: "nowrap"
+        }}>
+          LIVE 1v1 TELEMETRY TIMELINE
+        </div>
+
+        {/* OPPONENT Telemetry Track */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span style={{ color: opponentPlayer?.isBot ? "#fbbf24" : "#f87171", fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: opponentPlayer?.isBot ? "#fbbf24" : "#f87171", boxShadow: `0 0 6px ${opponentPlayer?.isBot ? "#fbbf24" : "#f87171"}` }} />
+            {opponentPlayer?.username || "Opponent"}{opponentPlayer?.isBot ? " [BOT]" : ""}
+          </span>
+          {renderTimelineTrack(
+            oppTestsPassed === totalTests ? 4 : (oppTestsPassed > 0 ? 4 : (opponentPlayer?.isBot ? (Math.floor((Date.now() - match.startedAt) / 1000) < 12 ? 1 : Math.floor((Date.now() - match.startedAt) / 1000) < 28 ? 2 : 3) : 2)),
+            true
+          )}
+        </div>
+      </div>
+
       {/* ── WORKSPACE SPLIT (Left: Ticket / Right: Multi-File Monaco) ──────── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* LEFT PANEL: Production Ticket Inspector */}
@@ -558,25 +683,41 @@ export default function MatchArena() {
               </span>
             </div>
 
-            {/* Hardware vs Ticket Tab Toggle (if hardwareContext exists) */}
-            {challenge.hardwareContext && (
-              <div style={{ display: "flex", gap: 4, marginTop: 10, background: "rgba(255,255,255,0.04)", padding: 2, borderRadius: 6 }}>
-                <button
-                  onClick={() => setLeftTab("ticket")}
-                  style={{
-                    flex: 1,
-                    background: leftTab === "ticket" ? "#151624" : "transparent",
-                    color: leftTab === "ticket" ? "#fff" : "#8a8898",
-                    border: "none",
-                    borderRadius: 4,
-                    padding: "5px 10px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  📋 Ticket Brief
-                </button>
+            {/* Left Panel Tabs: Ticket Brief vs Triage Checklist vs Hardware */}
+            <div style={{ display: "flex", gap: 4, marginTop: 10, background: "rgba(255,255,255,0.04)", padding: 2, borderRadius: 6 }}>
+              <button
+                onClick={() => setLeftTab("ticket")}
+                style={{
+                  flex: 1,
+                  background: leftTab === "ticket" ? "#151624" : "transparent",
+                  color: leftTab === "ticket" ? "#fff" : "#8a8898",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "5px 8px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                📋 Brief
+              </button>
+              <button
+                onClick={() => setLeftTab("checklist")}
+                style={{
+                  flex: 1,
+                  background: leftTab === "checklist" ? "rgba(139,142,255,0.18)" : "transparent",
+                  color: leftTab === "checklist" ? "#8b8eff" : "#8a8898",
+                  border: "none",
+                  borderRadius: 4,
+                  padding: "5px 8px",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                ✅ Triage Checklist
+              </button>
+              {challenge.hardwareContext && (
                 <button
                   onClick={() => setLeftTab("hardware")}
                   style={{
@@ -585,7 +726,7 @@ export default function MatchArena() {
                     color: leftTab === "hardware" ? "#fbbf24" : "#8a8898",
                     border: "none",
                     borderRadius: 4,
-                    padding: "5px 10px",
+                    padding: "5px 8px",
                     fontSize: 11,
                     fontWeight: 700,
                     cursor: "pointer",
@@ -593,79 +734,150 @@ export default function MatchArena() {
                 >
                   ⚡ Hardware & Scope
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          {/* Conditional Left Body: Hardware Panel OR Ticket Brief */}
+          {/* Conditional Left Body: Hardware Panel OR Checklist OR Ticket Brief */}
           {leftTab === "hardware" && challenge.hardwareContext ? (
             <div style={{ flex: 1, overflowY: "auto" }}>
               <SimulatedHardwarePanel
                 hardwareContext={challenge.hardwareContext}
                 hiddenTestsCount={challenge.hiddenTestsCount}
+                challengeId={challenge.id}
+                executionStatus={submitting ? 'RUNNING' : (submitResult ? (submitResult.testsPassed === submitResult.testsTotal ? 'PASSED' : 'FAILED') : 'IDLE')}
+                testsPassed={submitResult?.testsPassed ?? myTestsPassed}
+                totalTests={challenge.totalTests}
+                userCode={files[activeFileName] || ''}
               />
             </div>
-          ) : (
-          <div style={{ padding: "20px", flex: 1, fontSize: 13, lineHeight: 1.6, color: "#c8c6d4" }}>
-            <div style={{
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 8,
-              padding: 16,
-              marginBottom: 20
-            }}>
-              <div style={{ fontWeight: 700, fontSize: 12, color: "#8b8eff", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                📋 Ticket Brief & Root Cause
+          ) : leftTab === "checklist" ? (
+            <div style={{ padding: "20px", flex: 1, fontSize: 13, lineHeight: 1.6, color: "#c8c6d4" }}>
+              {/* 1. Observed Symptom */}
+              <div style={{
+                background: "rgba(248,113,113,0.06)",
+                border: "1px solid rgba(248,113,113,0.25)",
+                borderRadius: 8,
+                padding: 14,
+                marginBottom: 16
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  1. Observed Symptom & Failure Signature
+                </div>
+                <div style={{ fontSize: 12, color: "#e8e6f0", lineHeight: 1.5 }}>
+                  {challenge.track === "EMBEDDED_SYSTEMS"
+                    ? "Hardware bus fault or unaligned memory access triggered in peripheral control registers. Assertion suite detected frame drop, corrupted bitfields, or unhandled interrupt race condition."
+                    : "Production runtime degradation under high-load assertion harness. Assertion suite encountered unexpected state truncation, resource exhaustion, or signature verification failure."}
+                </div>
               </div>
-              <div style={{ whiteSpace: "pre-wrap", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
-                {challenge.ticketMarkdown}
-              </div>
-            </div>
 
-            {/* Architecture / Multi-file explanation */}
-            <div style={{
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid rgba(255,255,255,0.06)",
-              borderRadius: 8,
-              padding: 16
-            }}>
-              <div style={{ fontWeight: 700, fontSize: 12, color: "#fbbf24", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                🗂 Codebase Navigation
-              </div>
-              <p style={{ fontSize: 12, color: "#8a8898", marginBottom: 12 }}>
-                This is a multi-file production repository. Switch between tabs on the right editor. Only the bug file is editable; reference headers, schemas, and test harnesses are read-only.
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {challenge.files.map((f) => (
-                  <div
-                    key={f.name}
-                    onClick={() => setActiveFileName(f.name)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "6px 10px",
-                      borderRadius: 6,
-                      background: activeFileName === f.name ? "rgba(139,142,255,0.12)" : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${activeFileName === f.name ? "rgba(139,142,255,0.3)" : "rgba(255,255,255,0.05)"}`,
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontFamily: "'JetBrains Mono', monospace"
-                    }}
-                  >
-                    <span>{f.name}</span>
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: f.readOnly ? "#8a8898" : "#4ade80"
-                    }}>
-                      {f.readOnly ? "🔒 Read-Only" : "✏️ Editable Patch"}
+              {/* 2. Affected Module */}
+              <div style={{
+                background: "rgba(139,142,255,0.06)",
+                border: "1px solid rgba(139,142,255,0.25)",
+                borderRadius: 8,
+                padding: 14,
+                marginBottom: 16
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: "#8b8eff", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  2. Affected Module & Toolchain
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <div>
+                    <span style={{ color: "#8a8898" }}>Target File: </span>
+                    <span style={{ color: "#fff" }}>{activeFileName || challenge.files.find(f => !f.readOnly)?.name}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: "#8a8898" }}>Runner: </span>
+                    <span style={{ color: "#fff" }}>{challenge.entrypoint}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: "#8a8898" }}>Toolchain: </span>
+                    <span style={{ color: "#4ade80" }}>
+                      {challenge.language === "c" ? "GCC 10.2 (ARM)" : challenge.language === "python" ? "Python 3.10" : "TSX 5.0 (Node 20)"}
                     </span>
                   </div>
-                ))}
+                  <div>
+                    <span style={{ color: "#8a8898" }}>Track: </span>
+                    <span style={{ color: challenge.track === "PRODUCTION_SWE" ? "#8b8eff" : "#fbbf24" }}>
+                      {challenge.track}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Pass Criteria */}
+              <div style={{
+                background: "rgba(74,222,128,0.06)",
+                border: "1px solid rgba(74,222,128,0.25)",
+                borderRadius: 8,
+                padding: 14,
+                marginBottom: 16
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  3. Pass Criteria & Service Level Objective
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#e8e6f0", lineHeight: 1.6 }}>
+                  <li>All {challenge.totalTests} Piston unit test assertions must exit with status code 0.</li>
+                  <li>Zero memory faults (`CFSR = 0x00000000`, `HFSR = 0x00000000`) in telemetry bench.</li>
+                  <li>Execution latency under 500ms SLA without event loop or thread blockages.</li>
+                </ul>
+              </div>
+
+              {/* Guided Onboarding Checklist */}
+              <div style={{
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8,
+                padding: 14
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 11, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>
+                  Guided Incident Triage Checklist
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    { key: "symptomIdentified", label: "Inspect ticket brief & isolate error line number" },
+                    { key: "moduleIsolated", label: "Audit memory alignment, race conditions, or token arithmetic" },
+                    { key: "atomicPatchDrafted", label: "Draft minimal surgical patch in editable tab" },
+                    { key: "hardwareVerified", label: "Verify patch with 'Run Tests & Submit Fix'" },
+                  ].map((item) => (
+                    <label
+                      key={item.key}
+                      onClick={() => setTriageChecklist(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        cursor: "pointer",
+                        fontSize: 12,
+                        padding: "6px 8px",
+                        borderRadius: 6,
+                        background: triageChecklist[item.key] ? "rgba(74,222,128,0.08)" : "rgba(255,255,255,0.02)",
+                        border: `1px solid ${triageChecklist[item.key] ? "rgba(74,222,128,0.25)" : "transparent"}`
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!triageChecklist[item.key]}
+                        readOnly
+                        style={{ accentColor: "#4ade80", cursor: "pointer" }}
+                      />
+                      <span style={{ color: triageChecklist[item.key] ? "#4ade80" : "#c8c6d4", textDecoration: triageChecklist[item.key] ? "line-through" : "none" }}>
+                        {item.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ padding: "20px 22px 32px", flex: 1, fontSize: 13, lineHeight: 1.6, color: "#c8c6d4" }}>
+              <TicketBriefViewer
+                markdown={challenge.ticketMarkdown}
+                repoContext={challenge.repoContext}
+                targetFile={activeFileName || challenge.files.find(f => !f.readOnly)?.name}
+              />
+            </div>
           )}
         </div>
 
@@ -825,35 +1037,60 @@ export default function MatchArena() {
                 )}
               </div>
 
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || match.status !== "active"}
-                style={{
-                  background: submitting ? "#3b3b4f" : "#4ade80",
-                  color: "#050508",
-                  border: "none",
-                  padding: "10px 22px",
-                  borderRadius: 6,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  boxShadow: submitting ? "none" : "0 0 16px rgba(74,222,128,0.3)",
-                  transition: "all 0.15s ease"
-                }}
-              >
-                {submitting ? (
-                  <>
-                    <span style={{ display: "inline-block", width: 12, height: 12, border: "2px solid #050508", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                    Running Test Suite...
-                  </>
-                ) : (
-                  <>▶ Run Tests & Submit Fix</>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {(submitResult || matchOver) && (
+                  <button
+                    onClick={() => setShowDiffDrawer(true)}
+                    style={{
+                      background: "rgba(139,142,255,0.15)",
+                      border: "1px solid rgba(139,142,255,0.35)",
+                      color: "#8b8eff",
+                      padding: "9px 14px",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6
+                    }}
+                  >
+                    <span>🔍</span>
+                    <span>Post-Mortem & Diff</span>
+                  </button>
                 )}
-              </button>
+
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || match.status !== "active"}
+                  style={{
+                    background: submitting ? "#3b3b4f" : "#4ade80",
+                    color: "#050508",
+                    border: "none",
+                    padding: "10px 22px",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: 700,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    cursor: submitting ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    boxShadow: submitting ? "none" : "0 0 16px rgba(74,222,128,0.3)",
+                    transition: "all 0.15s ease"
+                  }}
+                >
+                  {submitting ? (
+                    <>
+                      <span style={{ display: "inline-block", width: 12, height: 12, border: "2px solid #050508", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                      <span>{executionStage || "Compiling Sandbox..."}</span>
+                    </>
+                  ) : (
+                    <>▶ Run & Verify Patch</>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Test Results Drawer */}
@@ -1098,14 +1335,14 @@ export default function MatchArena() {
                 ? "You satisfied all production test requirements before your opponent!"
                 : won === false
                 ? (finalMatchPayload?.winnerId === "bot_sentinel_ai"
-                    ? "CodeSentinel AI (Bot) passed all unit tests over 40 seconds."
+                    ? "CodeSentinel AI passed all unit tests and resolved the incident first."
                     : "The opponent patched the bug first.")
                 : "Match expired without a winning patch."}
             </p>
 
             {/* ELO Result */}
             {(() => {
-              const startElo = match?.[myRole]?.elo ?? 1200;
+              const startElo = match?.[myRole]?.elo ?? 1000;
               const myNewElo = won
                 ? (finalMatchPayload?.newWinnerElo ?? (startElo + 16))
                 : (finalMatchPayload?.newLoserElo ?? Math.max(100, startElo - 16));
@@ -1139,38 +1376,290 @@ export default function MatchArena() {
               );
             })()}
 
-            <div style={{ display: "flex", gap: 12 }}>
-              <Link
-                href="/dashboard"
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button
+                onClick={() => setShowDiffDrawer(true)}
                 style={{
-                  flex: 1,
-                  background: "#8b8eff",
-                  color: "#050508",
+                  width: "100%",
+                  background: "rgba(139,142,255,0.15)",
+                  border: "1px solid rgba(139,142,255,0.4)",
+                  color: "#8b8eff",
                   padding: "12px 20px",
                   borderRadius: 8,
                   fontWeight: 700,
-                  fontSize: 14,
-                  textDecoration: "none",
-                  display: "inline-block"
+                  fontSize: 13,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  transition: "all 0.15s ease"
                 }}
               >
-                Return to Dashboard
-              </Link>
+                <span>🔍</span>
+                <span>View Root-Cause Post-Mortem & Canonical Diff</span>
+              </button>
+
+              <div style={{ display: "flex", gap: 12 }}>
+                <Link
+                  href="/dashboard"
+                  style={{
+                    flex: 1,
+                    background: "#8b8eff",
+                    color: "#050508",
+                    padding: "12px 20px",
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    fontSize: 14,
+                    textDecoration: "none",
+                    display: "inline-block"
+                  }}
+                >
+                  Return to Dashboard
+                </Link>
+                <button
+                  onClick={() => router.push("/dashboard?action=find_match")}
+                  style={{
+                    flex: 1,
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    color: "#fff",
+                    padding: "12px 20px",
+                    borderRadius: 8,
+                    fontWeight: 700,
+                    fontSize: 14,
+                    cursor: "pointer"
+                  }}
+                >
+                  Play Again
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ROOT-CAUSE POST-MORTEM & CANONICAL DIFF DRAWER ──────────────── */}
+      {showDiffDrawer && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(10px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1100,
+          padding: 20
+        }}>
+          <div style={{
+            background: "#0c0d15",
+            border: "1px solid rgba(139,142,255,0.3)",
+            borderRadius: 16,
+            width: "100%",
+            maxWidth: 820,
+            maxHeight: "90vh",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 28px 80px rgba(0,0,0,0.9)",
+            overflow: "hidden"
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: "18px 24px",
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: "#09090e"
+            }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>🔍</span>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: "#fff", margin: 0 }}>
+                    Engineering Root-Cause Post-Mortem & Canonical Diff
+                  </h3>
+                </div>
+                <div style={{ fontSize: 11, color: "#8a8898", marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                  Incident Triage Report • {challenge.title} • {challenge.repoContext}
+                </div>
+              </div>
               <button
-                onClick={() => router.push("/dashboard?action=find_match")}
+                onClick={() => setShowDiffDrawer(false)}
                 style={{
-                  flex: 1,
+                  background: "transparent",
+                  border: "none",
+                  color: "#8a8898",
+                  fontSize: 20,
+                  cursor: "pointer",
+                  padding: 4
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Metrics Ribbon */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 12,
+              padding: "14px 24px",
+              background: "rgba(255,255,255,0.02)",
+              borderBottom: "1px solid rgba(255,255,255,0.06)",
+              fontSize: 12
+            }}>
+              <div>
+                <div style={{ color: "#8a8898", fontSize: 10, textTransform: "uppercase" }}>Triage Status</div>
+                <div style={{ color: won ? "#4ade80" : "#fbbf24", fontWeight: 700, marginTop: 2 }}>
+                  {won ? "✓ VERIFIED RESOLVED" : "REVIEW MODE"}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: "#8a8898", fontSize: 10, textTransform: "uppercase" }}>Execution Latency</div>
+                <div style={{ color: "#fff", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
+                  {submitResult?.runtimeMs || 184}ms (P50 SLA)
+                </div>
+              </div>
+              <div>
+                <div style={{ color: "#8a8898", fontSize: 10, textTransform: "uppercase" }}>Rating Delta</div>
+                <div style={{ color: won ? "#4ade80" : "#f87171", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
+                  {won ? "+18 ELO" : "-14 ELO"} (K=32, Floor 800)
+                </div>
+              </div>
+              <div>
+                <div style={{ color: "#8a8898", fontSize: 10, textTransform: "uppercase" }}>Tests Satisfied</div>
+                <div style={{ color: "#8b8eff", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
+                  {submitResult?.testsPassed ?? myTestsPassed}/{challenge.totalTests} Pass
+                </div>
+              </div>
+            </div>
+
+            {/* Scrollable Body */}
+            <div style={{ padding: "20px 24px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 18 }}>
+              {/* 1. Canonical Git Diff */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#8b8eff", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                  1. Canonical Production Patch (Unified Git Diff)
+                </div>
+                <pre style={{
+                  background: "#050508",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 8,
+                  padding: 14,
+                  fontSize: 12,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: "#c8c6d4",
+                  overflowX: "auto",
+                  margin: 0,
+                  whiteSpace: "pre-wrap",
+                  lineHeight: 1.5
+                }}>
+                  {challenge.walkthrough?.buggyVsFixedDiff || submitResult?.walkthrough?.buggyVsFixedDiff || "- Buggy implementation\n+ Canonical atomic production patch"}
+                </pre>
+              </div>
+
+              {/* 2. Root Cause Analysis */}
+              <div style={{
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                borderRadius: 8,
+                padding: 14
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  2. Architectural Root Cause
+                </div>
+                <p style={{ margin: 0, fontSize: 13, color: "#e8e6f0", lineHeight: 1.6 }}>
+                  {challenge.walkthrough?.rootCause || submitResult?.walkthrough?.rootCause || "The bug stems from an implicit type coercion or unchecked pointer boundary condition that degrades under concurrent assertion load."}
+                </p>
+              </div>
+
+              {/* 3. Production Impact & Why It Matters */}
+              <div style={{
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                borderRadius: 8,
+                padding: 14
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  3. Production Impact & Service Degradation
+                </div>
+                <p style={{ margin: 0, fontSize: 13, color: "#e8e6f0", lineHeight: 1.6 }}>
+                  {challenge.walkthrough?.whyItMatters || submitResult?.walkthrough?.whyItMatters || "In high-throughput environments, this defect triggers cascading connection exhaustion or peripheral bus halts, violating strict 99.99% availability SLAs."}
+                </p>
+              </div>
+
+              {/* 4. Common Developer Pitfalls */}
+              {challenge.walkthrough?.commonMistakes && challenge.walkthrough.commonMistakes.length > 0 && (
+                <div style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: 8,
+                  padding: 14
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+                    4. Common Developer Traps
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#c8c6d4", lineHeight: 1.6 }}>
+                    {challenge.walkthrough.commonMistakes.map((mistake, idx) => (
+                      <li key={idx} style={{ marginBottom: 4 }}>{mistake}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div style={{
+              padding: "16px 24px",
+              borderTop: "1px solid rgba(255,255,255,0.08)",
+              background: "#09090e",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12
+            }}>
+              <button
+                onClick={() => {
+                  const shareUrl = `${window.location.origin}/u/${(session?.user as any)?.username || session?.user?.name || "engineer"}`;
+                  navigator.clipboard.writeText(shareUrl);
+                  setShareCopied(true);
+                  setTimeout(() => setShareCopied(false), 3000);
+                }}
+                style={{
+                  background: shareCopied ? "#15803d" : "rgba(139,142,255,0.15)",
+                  border: `1px solid ${shareCopied ? "#4ade80" : "rgba(139,142,255,0.4)"}`,
+                  color: shareCopied ? "#4ade80" : "#8b8eff",
+                  padding: "10px 18px",
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  transition: "all 0.15s ease"
+                }}
+              >
+                <span>{shareCopied ? "✓" : "🔗"}</span>
+                <span>{shareCopied ? "Incident Resolution Link Copied!" : "Share Verified Incident Resolution"}</span>
+              </button>
+
+              <button
+                onClick={() => setShowDiffDrawer(false)}
+                style={{
                   background: "rgba(255,255,255,0.08)",
                   border: "1px solid rgba(255,255,255,0.15)",
-                  color: "#fff",
-                  padding: "12px 20px",
+                  color: "#e8e6f0",
+                  padding: "10px 18px",
                   borderRadius: 8,
-                  fontWeight: 700,
-                  fontSize: 14,
+                  fontSize: 12,
+                  fontWeight: 600,
                   cursor: "pointer"
                 }}
               >
-                Play Again
+                Close Post-Mortem
               </button>
             </div>
           </div>

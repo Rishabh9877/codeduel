@@ -1,5 +1,5 @@
 // =============================================================================
-// UNIVERSAL DATABASE ADAPTER FOR CODEDUEL (AWS DYNAMODB / NEON POSTGRES / LOCAL)
+// UNIVERSAL DATABASE ADAPTER FOR Codeduel (AWS DYNAMODB / NEON POSTGRES / LOCAL)
 // =============================================================================
 //
 // 1. If real AWS credentials exist -> routes directly to AWS DynamoDB.
@@ -76,6 +76,31 @@ async function ensureDbReady() {
         `;
         await pgSql`
           CREATE INDEX IF NOT EXISTS idx_codeduel_store_gsi1 ON codeduel_store (gsi1pk, gsi1sk DESC);
+        `;
+        await pgSql`
+          CREATE TABLE IF NOT EXISTS users (
+              id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+              github_id        BIGINT       NOT NULL UNIQUE,
+              github_username  VARCHAR(39)  NOT NULL UNIQUE,
+              email            VARCHAR(255) UNIQUE,
+              avatar_url       TEXT,
+              created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+              last_login_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+          );
+        `;
+        await pgSql`
+          CREATE TABLE IF NOT EXISTS friendships (
+              id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+              user_id_1    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              user_id_2    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              status       VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'accepted')),
+              created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+        `;
+        await pgSql`
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_users 
+          ON friendships (LEAST(user_id_1, user_id_2), GREATEST(user_id_1, user_id_2));
         `;
       } catch (err) {
         console.warn("[dynamo.ts] ensureDbReady notice:", err);

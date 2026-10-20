@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { createCohort } from "@/lib/campus";
+import { dynamo, TABLE } from "@/lib/dynamo";
+import { GetCommand } from "@aws-sdk/lib-dynamodb";
 
 export async function POST(req: Request) {
   try {
@@ -14,7 +16,28 @@ export async function POST(req: Request) {
     const userName = session.user.name || "Faculty Instructor";
 
     const body = await req.json();
-    const { code, title, department, institution, description } = body;
+    const { code, title, department, institution, description, facultyPasscode } = body;
+
+    // Faculty Verification Guard: ensure caller is an instructor or platform admin
+    const profileRes = await dynamo.send(
+      new GetCommand({ TableName: TABLE, Key: { PK: `USER#${userId}`, SK: "PROFILE" } })
+    );
+    const userRole = profileRes.Item?.role || (session.user as any).role || "INDIVIDUAL";
+    const isAdmin = userRole === "ADMIN";
+    const userEmail = session.user.email || "";
+    const isAcademicEmail = userEmail.endsWith(".edu") || userEmail.endsWith(".ac.in");
+    const expectedPasscode = (process.env.FACULTY_SECRET || "CODEDUEL-FACULTY-2026").toUpperCase();
+    const isPasscodeValid = facultyPasscode && facultyPasscode.trim().toUpperCase() === expectedPasscode;
+
+    if (!isAdmin && userRole !== "FACULTY" && !isAcademicEmail && !isPasscodeValid) {
+      return NextResponse.json(
+        {
+          error:
+            "Access Denied: Only verified faculty instructors can create university course cohorts. Please provide a valid Faculty Verification Key or switch to a verified instructor account.",
+        },
+        { status: 403 }
+      );
+    }
 
     if (!code || !title || !institution) {
       return NextResponse.json(

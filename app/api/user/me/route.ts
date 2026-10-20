@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { dynamo, TABLE } from "@/lib/dynamo";
-import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,12 @@ export async function GET() {
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const rawUsername = (session.user?.name || "").toLowerCase();
+  const isAdminUser =
+    rawUsername === "rishabh9877" ||
+    userId === "Rishabh9877" ||
+    (session.user?.email && session.user.email === process.env.ADMIN_EMAIL);
 
   try {
     let result = await dynamo.send(
@@ -32,7 +38,9 @@ export async function GET() {
         username,
         email: session.user?.email ?? null,
         avatar,
-        elo: 1200,
+        elo: 1000,
+        role: isAdminUser ? "ADMIN" : "INDIVIDUAL",
+        isAdmin: isAdminUser,
         wins: 0,
         losses: 0,
         createdAt: Date.now(),
@@ -47,7 +55,7 @@ export async function GET() {
             PK: `USER#${userId}`,
             SK: "LEADERBOARD",
             GSI1PK: "LEADERBOARD#GLOBAL",
-            GSI1SK: 1200,
+            GSI1SK: 1000,
             userId,
             username,
             avatar,
@@ -58,6 +66,20 @@ export async function GET() {
       );
 
       result = { Item: initialItem };
+    } else if (isAdminUser && !result.Item.isAdmin) {
+      result.Item.isAdmin = true;
+      try {
+        await dynamo.send(
+          new UpdateCommand({
+            TableName: TABLE,
+            Key: { PK: `USER#${userId}`, SK: "PROFILE" },
+            UpdateExpression: "SET isAdmin = :ia",
+            ExpressionAttributeValues: { ":ia": true },
+          })
+        );
+      } catch (upErr) {
+        console.warn("Could not set isAdmin in DB:", upErr);
+      }
     }
 
     const item = result.Item;
@@ -68,7 +90,11 @@ export async function GET() {
       userId,
       username: item.username ?? session.user?.name ?? "Coder",
       avatar: item.avatar ?? session.user?.image ?? null,
-      elo: item.elo ?? 1200,
+      elo: item.elo ?? 1000,
+      role: item.role ?? (isAdminUser ? "ADMIN" : "INDIVIDUAL"),
+      isAdmin: item.role === "ADMIN",
+      canBeAdmin: Boolean(isAdminUser),
+      isPlatformAdmin: Boolean(isAdminUser),
       wins,
       losses,
       totalMatches: wins + losses,

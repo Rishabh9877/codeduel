@@ -3,11 +3,21 @@
 import Link from "next/link";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import RoleSwitcherModal, { UserRole } from "@/components/RoleSwitcherModal";
 
 export default function LandingPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  const [previewTab, setPreviewTab] = useState<"embedded" | "swe">("embedded");
+  const [roleModalOpen, setRoleModalOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole>("STUDENT");
+
+  const handleSignInWithRole = (role: UserRole) => {
+    localStorage.setItem("preferred_role", role);
+    signIn("github");
+  };
 
   useEffect(() => {
     if (status === "authenticated") router.push("/dashboard");
@@ -246,79 +256,83 @@ export default function LandingPage() {
         }
 
         /* ── SECTIONS COMMON ─────────────────────────────── */
-        section { padding: 72px 24px; max-width: 980px; margin: 0 auto; scroll-margin-top: 70px; }
+        section { padding: 92px 24px; max-width: 1040px; margin: 0 auto; scroll-margin-top: 70px; }
         .eyebrow-sm {
           display: inline-block; font-size: 11px; font-family: 'JetBrains Mono', monospace;
-          text-transform: uppercase; letter-spacing: 0.1em; color: var(--indigo);
-          margin-bottom: 12px;
+          text-transform: uppercase; letter-spacing: 0.12em; color: var(--indigo);
+          margin-bottom: 14px;
         }
         .section-title {
-          font-size: clamp(26px, 4vw, 38px); font-weight: 700;
-          letter-spacing: -0.035em; line-height: 1.15; margin-bottom: 16px;
+          font-size: clamp(28px, 4.2vw, 42px); font-weight: 700;
+          letter-spacing: -0.035em; line-height: 1.18; margin-bottom: 16px;
         }
         .section-sub {
-          font-size: 15px; color: var(--muted2); line-height: 1.7; max-width: 640px; margin-bottom: 40px;
+          font-size: 15.5px; color: var(--muted2); line-height: 1.7; max-width: 660px; margin-bottom: 44px;
         }
         .fade-divider {
           border: none; height: 1px;
-          background: linear-gradient(90deg, transparent, var(--border2), transparent);
-          max-width: 980px; margin: 0 auto;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+          max-width: 1040px; margin: 0 auto;
         }
 
         /* ── THE PROBLEM ─────────────────────────────────── */
         .problem-grid {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 16px;
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+          gap: 20px;
         }
         .problem-card {
-          background: var(--bg2); border: 1px solid var(--border);
-          border-radius: 10px; padding: 24px;
-          display: flex; flex-direction: column; gap: 10px;
+          background: rgba(255,255,255,0.015); border: 1px solid var(--border);
+          border-radius: 12px; padding: 28px 24px;
+          display: flex; flex-direction: column; gap: 12px;
+          transition: border-color 0.2s;
         }
+        .problem-card:hover { border-color: var(--border2); }
         .problem-card h3 { font-size: 16px; font-weight: 600; color: var(--text); }
-        .problem-card p { font-size: 13.5px; color: var(--muted2); line-height: 1.6; }
+        .problem-card p { font-size: 13.5px; color: var(--muted2); line-height: 1.65; }
 
         /* ── HOW IT WORKS ────────────────────────────────── */
         .steps-grid {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 14px;
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 16px;
         }
         .step-card {
-          background: var(--bg2); border: 1px solid var(--border);
-          border-radius: 8px; padding: 20px 18px;
+          background: rgba(255,255,255,0.015); border: 1px solid var(--border);
+          border-radius: 10px; padding: 24px 22px;
         }
-        .step-num { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--indigo); margin-bottom: 8px; }
-        .step-name { font-size: 14.5px; font-weight: 700; margin-bottom: 8px; }
-        .step-desc { font-size: 12.5px; color: var(--muted2); line-height: 1.55; }
+        .step-num { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--indigo); margin-bottom: 8px; font-weight: 700; }
+        .step-name { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+        .step-desc { font-size: 13px; color: var(--muted2); line-height: 1.6; }
 
         /* ── TWO TRACKS ──────────────────────────────────── */
         .tracks-grid {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-          gap: 20px;
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+          gap: 24px;
         }
         .track-card {
-          background: var(--bg3); border: 1px solid var(--border);
-          border-radius: 12px; padding: 28px; display: flex; flex-direction: column; gap: 16px;
+          background: #08090e; border: 1px solid var(--border);
+          border-radius: 14px; padding: 32px 28px; display: flex; flex-direction: column; gap: 18px;
           position: relative; overflow: hidden;
+          transition: border-color 0.2s, transform 0.2s;
         }
+        .track-card:hover { border-color: rgba(139,142,255,0.3); transform: translateY(-2px); }
         .track-badge {
           display: inline-block; font-size: 11px; font-family: 'JetBrains Mono', monospace;
-          padding: 3px 10px; border-radius: 100px; width: fit-content;
+          padding: 3px 10px; border-radius: 100px; width: fit-content; font-weight: 600;
         }
         .track-card h3 { font-size: 20px; font-weight: 700; }
-        .track-card p { font-size: 13.5px; color: var(--muted2); line-height: 1.6; }
+        .track-card p { font-size: 14px; color: var(--muted2); line-height: 1.65; }
         .track-tags { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin-top: auto; }
         .track-tags li {
           font-size: 11px; font-family: 'JetBrains Mono', monospace;
-          background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+          background: rgba(255,255,255,0.03); border: 1px solid var(--border);
           padding: 3px 8px; border-radius: 4px; color: var(--muted2);
         }
 
         /* ── FOR COLLEGES ────────────────────────────────── */
         .campus-box {
-          background: linear-gradient(135deg, rgba(139,142,255,0.06) 0%, rgba(139,142,255,0.02) 100%);
-          border: 1px solid rgba(139,142,255,0.2);
-          border-radius: 14px; padding: 36px;
+          background: linear-gradient(135deg, rgba(139,142,255,0.04) 0%, rgba(139,142,255,0.01) 100%);
+          border: 1px solid rgba(139,142,255,0.18);
+          border-radius: 16px; padding: 36px 32px;
           display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center;
         }
         @media (max-width: 768px) {
@@ -327,34 +341,34 @@ export default function LandingPage() {
 
         /* ── PRICING TEASER ──────────────────────────────── */
         .pricing-grid {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-          gap: 16px; margin-bottom: 24px;
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 20px; margin-bottom: 28px;
         }
         .pricing-card {
-          background: var(--bg2); border: 1px solid var(--border);
-          border-radius: 10px; padding: 24px; display: flex; flex-direction: column;
+          background: rgba(255,255,255,0.015); border: 1px solid var(--border);
+          border-radius: 12px; padding: 28px 24px; display: flex; flex-direction: column;
         }
         .pricing-tier { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
         .pricing-price { font-size: 24px; font-weight: 800; font-family: 'JetBrains Mono', monospace; margin-bottom: 12px; }
-        .pricing-desc { font-size: 13px; color: var(--muted2); line-height: 1.5; margin-bottom: 16px; }
+        .pricing-desc { font-size: 13px; color: var(--muted2); line-height: 1.55; margin-bottom: 16px; }
         .pricing-features { list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: var(--muted2); margin-top: auto; }
 
         /* ── LIVE FEED TABLE ─────────────────────────────── */
         .feed-card {
-          background: var(--bg2); border: 1px solid var(--border);
-          border-radius: 10px; overflow: hidden;
+          background: rgba(255,255,255,0.015); border: 1px solid var(--border);
+          border-radius: 12px; overflow: hidden;
         }
         .feed-hdr {
-          padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
+          padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;
           border-bottom: 1px solid var(--border);
         }
         .feed-table { width: 100%; border-collapse: collapse; font-size: 13px; }
         .feed-table th {
-          text-align: left; padding: 10px 16px; font-size: 11px;
+          text-align: left; padding: 12px 20px; font-size: 11px;
           font-family: 'JetBrains Mono', monospace; color: var(--muted2);
           text-transform: uppercase; background: rgba(255,255,255,0.02);
         }
-        .feed-table td { padding: 14px 16px; border-top: 1px solid var(--border); }
+        .feed-table td { padding: 14px 20px; border-top: 1px solid var(--border); }
         .feed-badge {
           display: inline-block; padding: 2px 8px; border-radius: 4px;
           font-size: 11px; font-family: 'JetBrains Mono', monospace;
@@ -398,7 +412,7 @@ export default function LandingPage() {
       {/* TOP NAVIGATION */}
       <nav className="nav">
         <span className="nav-brand">
-          <span>CodeDuel</span>
+          <span>Codeduel</span>
           <span style={{
             fontSize: "10px",
             fontFamily: "'JetBrains Mono', monospace",
@@ -420,11 +434,11 @@ export default function LandingPage() {
           <li><Link href="/leaderboard">Leaderboard</Link></li>
         </ul>
         <div className="nav-right">
-          <button className="btn-primary" onClick={() => signIn("github")}>
+          <button className="btn-primary" onClick={() => setRoleModalOpen(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
             </svg>
-            GitHub
+            Sign In / Join Arena
           </button>
         </div>
       </nav>
@@ -434,33 +448,162 @@ export default function LandingPage() {
         <section className="hero">
           <div className="hero-eyebrow">
             <span className="eyebrow-dot" />
-            Private Alpha · Season 1
+            Real-Time Competitive Engineering Arena · Season 1
           </div>
           <h1 className="hero-h1">
             Don't write it.<br />
             <span className="accent">Fix it.</span>
           </h1>
-          <p className="hero-sub">
+          <p className="hero-sub" style={{ fontSize: "17px", fontWeight: 500, color: "var(--text)", maxWidth: "680px", marginBottom: "32px" }}>
             We train students and developers through 1v1 dynamic software and ECE duels.
           </p>
 
-          {/* CTAs */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center", marginBottom: "40px" }}>
-            <button className="btn-cta" onClick={() => signIn("github")}>
+          {/* Persona selector pills */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+              marginBottom: "18px",
+              zIndex: 1,
+            }}
+          >
+            <span style={{ fontSize: "11px", color: "var(--muted2)", textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono', monospace", marginRight: "4px" }}>
+              Join Platform As:
+            </span>
+            <button
+              onClick={() => handleSignInWithRole("STUDENT")}
+              style={{
+                background: "rgba(74,222,128,0.1)",
+                border: "1px solid rgba(74,222,128,0.3)",
+                color: "#4ade80",
+                padding: "6px 14px",
+                borderRadius: "100px",
+                fontSize: "12px",
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "transform 0.15s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              <span>🎓</span> College Student
+            </button>
+            <button
+              onClick={() => handleSignInWithRole("FACULTY")}
+              style={{
+                background: "rgba(56,189,248,0.1)",
+                border: "1px solid rgba(56,189,248,0.3)",
+                color: "#38bdf8",
+                padding: "6px 14px",
+                borderRadius: "100px",
+                fontSize: "12px",
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "transform 0.15s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              <span>🏛️</span> Faculty / Instructor
+            </button>
+            <button
+              onClick={() => handleSignInWithRole("INDIVIDUAL")}
+              style={{
+                background: "rgba(139,142,255,0.1)",
+                border: "1px solid rgba(139,142,255,0.3)",
+                color: "#8b8eff",
+                padding: "6px 14px",
+                borderRadius: "100px",
+                fontSize: "12px",
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                transition: "transform 0.15s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
+              onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+            >
+              <span>💻</span> Individual Dev
+            </button>
+          </div>
+
+          {/* Primary CTAs */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center", marginBottom: "32px", zIndex: 1 }}>
+            <button className="btn-cta" onClick={() => setRoleModalOpen(true)}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
               </svg>
               Sign in with GitHub
             </button>
             <Link href="/practice" className="btn-cta-ghost" style={{ fontWeight: 600 }}>
-              Practice solo →
+              Practice solo demo →
             </Link>
             <Link href="/campus" className="btn-cta-ghost" style={{ borderColor: "rgba(139,142,255,0.35)", color: "var(--indigo)" }}>
-              For colleges →
+              Campus edition →
             </Link>
           </div>
 
-          {/* HERO DEMO MOCK: BUGGY EMBEDDED-C RING BUFFER DUEL */}
+          {/* DUAL INCIDENT PREVIEW SWITCHER PILL */}
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "100px",
+              padding: "4px",
+              gap: "4px",
+              marginBottom: "24px",
+            }}
+          >
+            <button
+              onClick={() => setPreviewTab("embedded")}
+              style={{
+                background: previewTab === "embedded" ? "rgba(251,191,36,0.14)" : "transparent",
+                color: previewTab === "embedded" ? "#fbbf24" : "var(--muted2)",
+                border: previewTab === "embedded" ? "1px solid rgba(251,191,36,0.28)" : "1px solid transparent",
+                padding: "6px 16px",
+                borderRadius: "100px",
+                fontSize: "12px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              ⚡ Embedded C (ring_buffer.c)
+            </button>
+            <button
+              onClick={() => setPreviewTab("swe")}
+              style={{
+                background: previewTab === "swe" ? "rgba(56,189,248,0.14)" : "transparent",
+                color: previewTab === "swe" ? "#38bdf8" : "var(--muted2)",
+                border: previewTab === "swe" ? "1px solid rgba(56,189,248,0.28)" : "1px solid transparent",
+                padding: "6px 16px",
+                borderRadius: "100px",
+                fontSize: "12px",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              🌐 Cloud SWE (rateLimiter.ts)
+            </button>
+          </div>
+
+          {/* HERO DEMO CARD: LIVE INCIDENT PREVIEW (EMBEDDED C VS CLOUD SWE TS) */}
           <div className="arena-wrap">
             <div className="arena-card">
               <div className="arena-chrome">
@@ -468,12 +611,36 @@ export default function LandingPage() {
                   <div className="chrome-dot cd-r" />
                   <div className="chrome-dot cd-y" />
                   <div className="chrome-dot cd-g" />
-                  <span className="demo-tag" style={{ marginLeft: "8px" }}>Demo</span>
+                  <span
+                    style={{
+                      marginLeft: "8px",
+                      fontSize: "10px",
+                      fontFamily: "'JetBrains Mono', monospace",
+                      background: "rgba(244,63,94,0.18)",
+                      border: "1px solid rgba(244,63,94,0.4)",
+                      color: "#f43f5e",
+                      padding: "2px 8px",
+                      borderRadius: "4px",
+                      fontWeight: 800,
+                    }}
+                  >
+                    DON'T WRITE IT. FIX IT. — LIVE OUTAGE
+                  </span>
                 </div>
                 <div className="chrome-tabs">
-                  <span className="chrome-tab active">✏️ ring_buffer.c</span>
-                  <span className="chrome-tab">🔒 ring_buffer.h</span>
-                  <span className="chrome-tab">🔒 test_suite.c</span>
+                  {previewTab === "embedded" ? (
+                    <>
+                      <span className="chrome-tab active">✏️ ring_buffer.c</span>
+                      <span className="chrome-tab">🔒 ring_buffer.h</span>
+                      <span className="chrome-tab">🔒 test_suite.c</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="chrome-tab active" style={{ color: "#38bdf8" }}>✏️ rateLimiter.ts</span>
+                      <span className="chrome-tab">🔒 types.ts</span>
+                      <span className="chrome-tab">🔒 rateLimiter.test.ts</span>
+                    </>
+                  )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontSize: "11px", fontFamily: "'JetBrains Mono', monospace", color: "var(--amber)", fontWeight: 700 }}>
@@ -485,48 +652,86 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* EDITOR BODY (C Embedded snippet with bug) */}
+              {/* EDITOR BODY (Switchable between ring_buffer.c and rateLimiter.ts) */}
               <div className="editor-body">
                 <div className="line-nums">
                   {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => <div key={n}>{n}</div>)}
                 </div>
                 <div className="code-area">
-                  <div><span className="cm">// Issue #44: UART Ring Buffer Telemetry Loss under high baud rate</span></div>
-                  <div><span className="cm">// BUG: Off-by-one check drops valid packet when tail wraps buffer limit</span></div>
-                  <div><span className="k">bool </span><span className="fn">ring_buf_enqueue</span><span className="pn">(ring_buf_t *rb, </span><span className="k">uint8_t </span>byte<span className="pn">) {"{"}</span></div>
-                  <div>&nbsp;&nbsp;<span className="k">uint32_t </span>next_head = (rb-&gt;head + <span className="num">1</span>) % rb-&gt;capacity;</div>
-                  <div>&nbsp;&nbsp;<span className="cm">// Defect: rejects valid byte when index equals tail offset</span></div>
-                  <div>&nbsp;&nbsp;<span className="k">if </span>(next_head == rb-&gt;tail) <span className="pn">{"{"}</span></div>
-                  <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="err">return false; // Packet lost during DMA burst!</span></div>
-                  <div>&nbsp;&nbsp;<span className="pn">{"}"}</span></div>
-                  <div>&nbsp;&nbsp;rb-&gt;buffer[rb-&gt;head] = byte;</div>
-                  <div>&nbsp;&nbsp;rb-&gt;head = next_head;</div>
-                  <div>&nbsp;&nbsp;<span className="k">return true</span>;</div>
-                  <div><span className="pn">{"}"}</span></div>
+                  {previewTab === "embedded" ? (
+                    <>
+                      <div><span className="cm">// Issue #44: UART Ring Buffer Telemetry Loss under high baud rate</span></div>
+                      <div><span className="cm">// BUG: Off-by-one check drops valid packet when tail wraps buffer limit</span></div>
+                      <div><span className="k">bool </span><span className="fn">ring_buf_enqueue</span><span className="pn">(ring_buf_t *rb, </span><span className="k">uint8_t </span>byte<span className="pn">) {"{"}</span></div>
+                      <div>&nbsp;&nbsp;<span className="k">uint32_t </span>next_head = (rb-&gt;head + <span className="num">1</span>) % rb-&gt;capacity;</div>
+                      <div>&nbsp;&nbsp;<span className="cm">// Defect: rejects valid byte when index equals tail offset</span></div>
+                      <div>&nbsp;&nbsp;<span className="k">if </span>(next_head == rb-&gt;tail) <span className="pn">{"{"}</span></div>
+                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="err">return false; // Packet lost during DMA burst!</span></div>
+                      <div>&nbsp;&nbsp;<span className="pn">{"}"}</span></div>
+                      <div>&nbsp;&nbsp;rb-&gt;buffer[rb-&gt;head] = byte;</div>
+                      <div>&nbsp;&nbsp;rb-&gt;head = next_head;</div>
+                      <div>&nbsp;&nbsp;<span className="k">return true</span>;</div>
+                      <div><span className="pn">{"}"}</span></div>
+                    </>
+                  ) : (
+                    <>
+                      <div><span className="cm">// Incident #812: API Gateway Token Bucket Rate Limiter Starvation</span></div>
+                      <div><span className="cm">// BUG: Math.floor(elapsed / 1000) truncates sub-second token replenishment</span></div>
+                      <div><span className="k">export class </span><span className="fn">TokenBucket</span><span className="pn"> {"{"}</span></div>
+                      <div>&nbsp;&nbsp;<span className="fn">allowRequest</span><span className="pn">(tokensNeeded = <span className="num">1</span>): </span><span className="k">boolean</span> <span className="pn">{"{"}</span></div>
+                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="k">const </span>elapsedMs = Date.now() - <span className="k">this</span>.lastRefillMs;</div>
+                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="cm">// Defect: integer division truncates fractional seconds to 0</span></div>
+                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="err">const refill = Math.floor(elapsedMs / 1000) * this.refillRate;</span></div>
+                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="k">this</span>.tokens = Math.min(<span className="k">this</span>.capacity, <span className="k">this</span>.tokens + refill);</div>
+                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="k">if </span>(<span className="k">this</span>.tokens &gt;= tokensNeeded) <span className="pn">{"{"}</span> <span className="k">this</span>.tokens -= tokensNeeded; <span className="k">return true</span>; <span className="pn">{"}"}</span></div>
+                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="k">return false</span>;</div>
+                      <div>&nbsp;&nbsp;<span className="pn">{"}"}</span></div>
+                      <div><span className="pn">{"}"}</span></div>
+                    </>
+                  )}
                 </div>
               </div>
 
               {/* TEST BADGES PANEL */}
               <div className="test-badges-panel">
-                <div className="test-badge-row">
-                  <span className="tb-pass">✓ TEST 1: Buffer Initialization & Normal Enqueue</span>
-                  <span className="tb-pass">PASSED</span>
-                </div>
-                <div className="test-badge-row">
-                  <span className="tb-fail">✗ TEST 2: High-Speed UART Wrap-Around Telemetry</span>
-                  <span className="tb-fail">FAILED (Byte dropped at index 255)</span>
-                </div>
-                <div className="test-badge-row">
-                  <span className="tb-pending">⏳ TEST 3: Concurrent ISR Overrun Protection</span>
-                  <span className="tb-pending">AWAITING PATCH</span>
-                </div>
+                {previewTab === "embedded" ? (
+                  <>
+                    <div className="test-badge-row">
+                      <span className="tb-pass">✓ TEST 1: Buffer Initialization &amp; Normal Enqueue</span>
+                      <span className="tb-pass">PASSED</span>
+                    </div>
+                    <div className="test-badge-row">
+                      <span className="tb-fail">✗ TEST 2: High-Speed UART Wrap-Around Telemetry</span>
+                      <span className="tb-fail">FAILED (Byte dropped at index 255)</span>
+                    </div>
+                    <div className="test-badge-row">
+                      <span className="tb-pending">⏳ TEST 3: Concurrent ISR Overrun Protection</span>
+                      <span className="tb-pending">AWAITING PATCH</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="test-badge-row">
+                      <span className="tb-pass">✓ TEST 1: Sustained 1-second burst traffic consumption</span>
+                      <span className="tb-pass">PASSED</span>
+                    </div>
+                    <div className="test-badge-row">
+                      <span className="tb-fail">✗ TEST 2: Sub-second fractional token replenishment (500ms intervals)</span>
+                      <span className="tb-fail">FAILED (Expected tokens &gt; 0, got 0)</span>
+                    </div>
+                    <div className="test-badge-row">
+                      <span className="tb-pending">⏳ TEST 3: High-frequency RPC storm concurrency</span>
+                      <span className="tb-pending">AWAITING PATCH</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* OPPONENT PROGRESS BAR */}
               <div className="opponent-status-bar">
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ color: "var(--muted2)" }}>Opponent:</span>
-                  <span style={{ color: "var(--amber)", fontWeight: 600 }}>CodeSentinel AI (Bot)</span>
+                  <span style={{ color: "var(--amber)", fontWeight: 600 }}>CodeSentinel AI [BOT]</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <div style={{ width: "90px", height: "6px", background: "rgba(255,255,255,0.1)", borderRadius: "3px", overflow: "hidden" }}>
@@ -564,7 +769,7 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="problem-card">
-              <h3>The CodeDuel Standard</h3>
+              <h3>The Codeduel Standard</h3>
               <p>
                 We put you in authentic multi-file codebases with failing integration tests and customer incident tickets. You locate the root defect, write the patch, and prove correctness in live competitive duels.
               </p>
@@ -609,39 +814,62 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* SECTION 3: TWO TRACKS */}
+        {/* SECTION 3: TWO TRACKS & ELO CALIBRATION */}
         <hr className="fade-divider" />
         <section id="tracks">
-          <span className="eyebrow-sm reveal">Two Tracks</span>
-          <h2 className="section-title reveal">Specialized arenas for modern engineering.</h2>
-          <p className="section-sub reveal">
-            Whether you are building bare-metal firmware or cloud microservices, CodeDuel tests the exact skills required on the job.
-          </p>
+          <div style={{ textAlign: "center", marginBottom: "48px" }}>
+            <span className="eyebrow-sm reveal">Two Engineering Tracks</span>
+            <h2 className="section-title reveal" style={{ maxWidth: "720px", margin: "0 auto 14px" }}>
+              Specialized arenas for modern systems engineering.
+            </h2>
+            <p className="section-sub reveal" style={{ maxWidth: "620px", margin: "0 auto" }}>
+              Race to diagnose customer tickets, patch multi-file repositories, and pass automated unit tests across your chosen discipline.
+            </p>
+          </div>
+
           <div className="tracks-grid reveal-stagger">
+            {/* Embedded Systems Track */}
             <div className="track-card">
               <span className="track-badge" style={{ background: "rgba(251,191,36,0.12)", color: "var(--amber)", border: "1px solid rgba(251,191,36,0.25)" }}>
-                ECE & Hardware Track
+                ⚡ ECE &amp; HARDWARE TRACK
               </span>
-              <h3>Embedded Systems & Electronics (C)</h3>
+              <h3>Embedded Systems &amp; Electronics (C)</h3>
               <p>
-                Debug low-level microcontroller drivers, peripheral communication buses, memory-constrained buffers, and timing glitches before deploying to hardware.
+                Debug microcontroller drivers, peripheral communication buses, memory-constrained circular buffers, and timing races before deploying to silicon.
               </p>
               <ul className="track-tags">
-                <li>Circular Ring Buffers</li>
-                <li>GPIO Debounce Interrupts</li>
+                <li>UART Ring Buffers</li>
+                <li>GPIO Debounce ISRs</li>
                 <li>SPI Multi-Byte Endianness</li>
                 <li>PWM Timer Prescalers</li>
-                <li>Bare-Metal Clang/GCC</li>
+                <li>ARM Cortex-M Faults</li>
               </ul>
+              <div style={{ display: "flex", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
+                <Link
+                  href="/practice?track=EMBEDDED_SYSTEMS"
+                  className="btn-cta"
+                  style={{ background: "#fbbf24", color: "#000", fontSize: "13px", padding: "9px 16px" }}
+                >
+                  Practice Embedded →
+                </Link>
+                <Link
+                  href="/dashboard?action=find_match&track=EMBEDDED_SYSTEMS"
+                  className="btn-cta-ghost"
+                  style={{ fontSize: "13px", padding: "9px 16px" }}
+                >
+                  Queue 1v1 ECE Match ⚡
+                </Link>
+              </div>
             </div>
 
+            {/* Cloud SWE Track */}
             <div className="track-card">
               <span className="track-badge" style={{ background: "rgba(139,142,255,0.12)", color: "var(--indigo)", border: "1px solid rgba(139,142,255,0.25)" }}>
-                Software Engineering Track
+                🌐 CLOUD &amp; BACKEND TRACK
               </span>
               <h3>Cloud Software Engineering (TypeScript / Python)</h3>
               <p>
-                Diagnose backend service outages, concurrency bottlenecks, connection pool resource leaks, and security exploits in modern application stacks.
+                Diagnose backend service outages, concurrency bottlenecks, connection pool resource leaks, and authentication bypasses in production stacks.
               </p>
               <ul className="track-tags">
                 <li>Token Bucket Rate Limiters</li>
@@ -650,92 +878,181 @@ export default function LandingPage() {
                 <li>PostgreSQL Pool Leaks</li>
                 <li>Cache Stampede Mutexes</li>
               </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* SECTION 4: FOR COLLEGES */}
-        <hr className="fade-divider" />
-        <section id="campus">
-          <div className="campus-box reveal">
-            <div>
-              <span className="eyebrow-sm">For Colleges & Faculty</span>
-              <h2 style={{ fontSize: "28px", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "12px" }}>
-                Practical debugging labs for electronics and programming courses.
-              </h2>
-              <p style={{ fontSize: "14px", color: "var(--muted2)", lineHeight: 1.6, maxWidth: "560px", marginBottom: "16px" }}>
-                Engineering universities use CodeDuel to turn passive programming and embedded labs into hands-on, high-stakes debugging sessions. Create classes, assign incident tickets, and review verified student progress.
-              </p>
-              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", fontSize: "12.5px", color: "var(--text)" }}>
-                <span>✓ Unguessable class join codes</span>
-                <span>✓ Automated test-suite grading</span>
-                <span>✓ Detailed student attempt logs</span>
+              <div style={{ display: "flex", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
+                <Link
+                  href="/practice?track=PRODUCTION_SWE"
+                  className="btn-cta"
+                  style={{ background: "#8b8eff", color: "#000", fontSize: "13px", padding: "9px 16px" }}
+                >
+                  Practice Cloud SWE →
+                </Link>
+                <Link
+                  href="/dashboard?action=find_match&track=PRODUCTION_SWE"
+                  className="btn-cta-ghost"
+                  style={{ fontSize: "13px", padding: "9px 16px" }}
+                >
+                  Queue 1v1 SWE Match ⚡
+                </Link>
               </div>
             </div>
-            <div>
+          </div>
+
+          {/* Minimal ELO Bracket Calibration Strip */}
+          <div
+            style={{
+              marginTop: "28px",
+              padding: "16px 24px",
+              borderRadius: "12px",
+              background: "rgba(255,255,255,0.015)",
+              border: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "12px",
+            }}
+          >
+            <span style={{ fontSize: "12px", fontFamily: "'JetBrains Mono', monospace", color: "var(--muted2)" }}>
+              Calibrated ELO Rating Brackets:
+            </span>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               <Link
-                href="/campus"
+                href="/practice?difficulty=easy"
                 style={{
-                  display: "inline-block",
-                  background: "var(--indigo)",
-                  color: "#050508",
-                  padding: "12px 24px",
-                  borderRadius: "8px",
-                  fontWeight: 700,
-                  fontSize: "14px",
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: "#4ade80",
+                  background: "rgba(74,222,128,0.08)",
+                  border: "1px solid rgba(74,222,128,0.2)",
+                  padding: "4px 12px",
+                  borderRadius: "6px",
                   textDecoration: "none",
-                  whiteSpace: "nowrap"
                 }}
               >
-                Explore Campus Mode →
+                Bracket I: Junior / Intern (800–1099 ELO)
+              </Link>
+              <Link
+                href="/practice?difficulty=medium"
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: "#fbbf24",
+                  background: "rgba(251,191,36,0.08)",
+                  border: "1px solid rgba(251,191,36,0.2)",
+                  padding: "4px 12px",
+                  borderRadius: "6px",
+                  textDecoration: "none",
+                }}
+              >
+                Bracket II: Systems Engineer (1100–1399 ELO)
+              </Link>
+              <Link
+                href="/practice?difficulty=hard"
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: "#f43f5e",
+                  background: "rgba(244,63,94,0.08)",
+                  border: "1px solid rgba(244,63,94,0.2)",
+                  padding: "4px 12px",
+                  borderRadius: "6px",
+                  textDecoration: "none",
+                }}
+              >
+                Bracket III: Staff / Principal (1400+ ELO)
               </Link>
             </div>
           </div>
         </section>
 
-        {/* SECTION 4.5: PLACEMENT & IT RECRUITMENT READINESS */}
+        {/* SECTION 4: CAMPUS & PLACEMENT READINESS */}
         <hr className="fade-divider" />
-        <section id="placement">
-          <div style={{ textAlign: "center", marginBottom: "36px" }}>
-            <span className="eyebrow-sm reveal">Campus Placements & IT Recruitment</span>
-            <h2 className="section-title reveal" style={{ maxWidth: "760px", margin: "0 auto 10px" }}>
-              Trained for Tier-1 Product Engineering &amp; Service-Based IT Assessments.
+        <section id="campus">
+          <div style={{ textAlign: "center", marginBottom: "40px" }}>
+            <span className="eyebrow-sm reveal">Institutional &amp; Hiring Readiness</span>
+            <h2 className="section-title reveal" style={{ maxWidth: "700px", margin: "0 auto 12px" }}>
+              Built for engineering universities &amp; technical placement rounds.
             </h2>
-            <p className="section-sub reveal" style={{ maxWidth: "680px", margin: "0 auto" }}>
-              Whether students are targeting core hardware giants and cloud systems, or preparing for high-volume IT services technical assessments (TCS NQT, Infosys, Cognizant, Wipro, Accenture), CodeDuel trains them to isolate edge cases and pass time-pressured coding tests.
+            <p className="section-sub reveal" style={{ maxWidth: "620px", margin: "0 auto" }}>
+              Turn passive programming labs into high-stakes debugging sessions, calibrated for core hardware firms and IT assessments.
             </p>
           </div>
-          <div className="tracks-grid reveal-stagger">
-            <div className="track-card" style={{ borderColor: "rgba(56,189,248,0.25)" }}>
-              <span className="track-badge" style={{ background: "rgba(56,189,248,0.12)", color: "var(--cyan)", border: "1px solid rgba(56,189,248,0.25)" }}>
-                Tier-1 Product &amp; Hardware Tracks
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "24px" }}>
+            {/* Campus & Lab Hub */}
+            <div
+              style={{
+                background: "rgba(139,142,255,0.03)",
+                border: "1px solid rgba(139,142,255,0.18)",
+                borderRadius: "14px",
+                padding: "32px 28px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "10.5px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: 700,
+                  color: "var(--indigo)",
+                  background: "rgba(139,142,255,0.12)",
+                  border: "1px solid rgba(139,142,255,0.25)",
+                  padding: "3px 10px",
+                  borderRadius: "100px",
+                  width: "fit-content",
+                }}
+              >
+                🏫 UNIVERSITY FACULTY &amp; LABS
               </span>
-              <h3>Core Systems, Semiconductors &amp; Cloud</h3>
-              <p>
-                Qualcomm, Texas Instruments, Google, and high-growth startups test low-level memory layout, concurrency, and real-time RTOS drivers.
+              <h3 style={{ fontSize: "20px", fontWeight: 700 }}>Autonomous Lab Management</h3>
+              <p style={{ fontSize: "14px", color: "var(--muted2)", lineHeight: 1.6, margin: 0 }}>
+                Professors create custom lab cohorts with 6-character join codes (e.g. PEC301), assign production incident tickets, and download automated CSV gradebooks with student telemetry.
               </p>
-              <ul className="track-tags">
-                <li>ARM Cortex-M Hardware Faults</li>
-                <li>UART / SPI Protocol Drivers</li>
-                <li>Distributed Token Bucket Limits</li>
-                <li>PostgreSQL Connection Pools</li>
-              </ul>
+              <div style={{ marginTop: "auto", paddingTop: "12px" }}>
+                <Link href="/campus" className="btn-cta" style={{ background: "var(--indigo)", color: "#000", fontSize: "13px" }}>
+                  Explore Campus Portal →
+                </Link>
+              </div>
             </div>
 
-            <div className="track-card" style={{ borderColor: "rgba(139,142,255,0.25)" }}>
-              <span className="track-badge" style={{ background: "rgba(139,142,255,0.12)", color: "var(--indigo)", border: "1px solid rgba(139,142,255,0.25)" }}>
-                Service-Based IT &amp; NQT Assessment Track
+            {/* Placement & IT Recruitment */}
+            <div
+              style={{
+                background: "rgba(56,189,248,0.03)",
+                border: "1px solid rgba(56,189,248,0.18)",
+                borderRadius: "14px",
+                padding: "32px 28px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "10.5px",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontWeight: 700,
+                  color: "#38bdf8",
+                  background: "rgba(56,189,248,0.12)",
+                  border: "1px solid rgba(56,189,248,0.25)",
+                  padding: "3px 10px",
+                  borderRadius: "100px",
+                  width: "fit-content",
+                }}
+              >
+                🎯 CORE &amp; IT PLACEMENT PREP
               </span>
-              <h3>Mass Recruiter Coding Rounds &amp; Enterprise Triage</h3>
-              <p>
-                TCS NQT, Cognizant GenC, Infosys HackWithInfy, and Accenture technical evaluations test edge-case isolation, boundary errors, and bug resolution under clock pressure.
+              <h3 style={{ fontSize: "20px", fontWeight: 700 }}>Product Cores &amp; Mass IT Hiring</h3>
+              <p style={{ fontSize: "14px", color: "var(--muted2)", lineHeight: 1.6, margin: 0 }}>
+                Train students to conquer technical rounds for core systems (Qualcomm, Texas Instruments, Google) and high-volume IT assessments (TCS NQT, Infosys, Cognizant, Accenture).
               </p>
-              <ul className="track-tags">
-                <li>Boundary Condition &amp; Wrap-Around</li>
-                <li>String &amp; Token Parsing Edge Cases</li>
-                <li>Async Worker Starvation</li>
-                <li>Automated Test Assertion Speed</li>
-              </ul>
+              <div style={{ marginTop: "auto", paddingTop: "12px" }}>
+                <Link href="/practice" className="btn-cta-ghost" style={{ fontSize: "13px" }}>
+                  Practice Placement Incidents →
+                </Link>
+              </div>
             </div>
           </div>
         </section>
@@ -743,53 +1060,63 @@ export default function LandingPage() {
         {/* SECTION 5: PRICING TEASER */}
         <hr className="fade-divider" />
         <section id="pricing">
-          <div style={{ textAlign: "center", marginBottom: "36px" }}>
-            <span className="eyebrow-sm reveal">Pricing Teaser</span>
-            <h2 className="section-title reveal" style={{ maxWidth: "600px", margin: "0 auto 10px" }}>
-              Honest subscriptions for students and colleges.
+          <div style={{ textAlign: "center", marginBottom: "40px" }}>
+            <span className="eyebrow-sm reveal">Transparent Subscriptions</span>
+            <h2 className="section-title reveal" style={{ maxWidth: "600px", margin: "0 auto 12px" }}>
+              Plans for ambitious engineers &amp; colleges.
             </h2>
-            <p style={{ fontSize: "13px", color: "var(--muted2)" }}>
-              Transparent tiers for individual developer mastery and scalable university departmental labs.
+            <p className="section-sub reveal" style={{ maxWidth: "540px", margin: "0 auto" }}>
+              Transparent tiers for individual developer mastery and turnkey university departmental labs.
             </p>
           </div>
+
           <div className="pricing-grid reveal-stagger">
             <div className="pricing-card">
-              <div className="pricing-tier">Free Tier</div>
-              <div className="pricing-price">$0</div>
-              <p className="pricing-desc">For students starting their practical debugging journey.</p>
+              <div className="pricing-tier">Student Free</div>
+              <div className="pricing-price">
+                ₹0 <span style={{ fontSize: "13px", color: "var(--muted2)", fontWeight: 400 }}>($0) / mo</span>
+              </div>
+              <p className="pricing-desc">Foundational debugging training for engineering students getting started.</p>
               <ul className="pricing-features">
-                <li>• Daily 1v1 ranked duels</li>
-                <li>• Core challenge catalog access</li>
-                <li>• Global ELO leaderboard</li>
-                <li>• Basic Socratic AI coach hints</li>
+                <li>• Unlimited 1v1 matchmaking &amp; duels</li>
+                <li>• Daily Practice Challenge with streaks</li>
+                <li>• Tier-1 Socratic AI guidance per duel</li>
+                <li>• Global real-time ELO leaderboard</li>
               </ul>
             </div>
-            <div className="pricing-card" style={{ borderColor: "rgba(139,142,255,0.3)", background: "rgba(139,142,255,0.03)" }}>
-              <div className="pricing-tier" style={{ color: "var(--indigo)" }}>Pro Student</div>
-              <div className="pricing-price">$12 <span style={{ fontSize: "13px", color: "var(--muted2)", fontWeight: 400 }}>/ mo</span></div>
-              <p className="pricing-desc">For developers preparing for rigorous technical interviews and lab exams.</p>
+
+            <div className="pricing-card" style={{ borderColor: "rgba(139,142,255,0.35)", background: "rgba(139,142,255,0.04)" }}>
+              <div className="pricing-tier" style={{ color: "var(--indigo)" }}>Pro Engineer</div>
+              <div className="pricing-price">
+                ₹100 <span style={{ fontSize: "13px", color: "var(--muted2)", fontWeight: 400 }}>($19) / mo</span>
+              </div>
+              <p className="pricing-desc">Primary B2C subscription for developers targeting top product and firmware roles.</p>
               <ul className="pricing-features">
-                <li>• Unlimited solo practice arena</li>
-                <li>• Complete multi-file catalog</li>
-                <li>• Deep post-match walkthroughs</li>
-                <li>• Unlimited Socratic AI hints</li>
+                <li>• Unlimited 3-Tier Socratic AI Coach</li>
+                <li>• Digital Oscilloscope &amp; Logic Analyzer</li>
+                <li>• ARM Cortex MMIO fault telemetry</li>
+                <li>• Verified Recruiter Portfolio &amp; Certificates</li>
               </ul>
             </div>
-            <div className="pricing-card">
-              <div className="pricing-tier">Campus Department</div>
-              <div className="pricing-price">Custom <span style={{ fontSize: "13px", color: "var(--muted2)", fontWeight: 400 }}>/ campus</span></div>
-              <p className="pricing-desc">For engineering departments and university lab instructors.</p>
+
+            <div className="pricing-card" style={{ borderColor: "rgba(56,189,248,0.25)", background: "rgba(56,189,248,0.02)" }}>
+              <div className="pricing-tier" style={{ color: "#38bdf8" }}>Campus Department</div>
+              <div className="pricing-price">
+                ₹40,000 <span style={{ fontSize: "13px", color: "var(--muted2)", fontWeight: 400 }}>($499) / term</span>
+              </div>
+              <p className="pricing-desc">Secondary B2B institutional licensing for university engineering departments.</p>
               <ul className="pricing-features">
-                <li>• Class management & join codes</li>
-                <li>• Timed lab assignments</li>
-                <li>• Class performance dashboards</li>
-                <li>• CSV student analytics exports</li>
+                <li>• Unlimited student seats across department</li>
+                <li>• 6-character cohort join codes (e.g. PEC301)</li>
+                <li>• Automated lab grading &amp; plagiarism telemetry</li>
+                <li>• Downloadable Automated CSV Gradebook</li>
               </ul>
             </div>
           </div>
+
           <div style={{ textAlign: "center" }}>
             <Link href="/pricing" className="btn-cta-ghost" style={{ display: "inline-flex" }}>
-              View Complete Plans & Tier Details →
+              View Complete Pricing Details &amp; ROI Calculator →
             </Link>
           </div>
         </section>
@@ -857,13 +1184,13 @@ export default function LandingPage() {
         <div className="footer-grid">
           <div className="footer-col">
             <div style={{ fontSize: "16px", fontWeight: 800, color: "#fff", marginBottom: "10px" }}>
-              Code<span style={{ color: "var(--indigo)" }}>Duel</span>
+              Codeduel
             </div>
             <p style={{ fontSize: "13px", color: "var(--muted2)", lineHeight: 1.6, maxWidth: "340px", margin: "0 0 14px" }}>
               We train students and developers through 1v1 dynamic software and ECE duels. Real production codebases, zero textbook puzzle memorization.
             </p>
             <div style={{ fontSize: "12px", color: "var(--muted2)", fontFamily: "'JetBrains Mono', monospace" }}>
-              📍 Punjab Engineering College (PEC), Chandigarh
+              📍 Global Engineering Network · Remote &amp; Universities Everywhere
             </div>
           </div>
 
@@ -891,7 +1218,7 @@ export default function LandingPage() {
           <div className="footer-col">
             <h4>Company &amp; Legal</h4>
             <ul>
-              <li><Link href="/about">About CodeDuel</Link></li>
+              <li><Link href="/about">About Codeduel</Link></li>
               <li><Link href="/privacy">Privacy Policy (DPDP)</Link></li>
               <li><Link href="/terms">Terms of Service</Link></li>
               <li><Link href="/contact">Contact &amp; Partnerships</Link></li>
@@ -901,7 +1228,7 @@ export default function LandingPage() {
 
         <div className="footer-bottom">
           <div>
-            © 2026 CodeDuel Inc. All rights reserved.
+            © 2026 Codeduel Inc. All rights reserved.
           </div>
           <div style={{ display: "flex", gap: "16px" }}>
             <Link href="/privacy" style={{ color: "var(--muted2)", textDecoration: "none" }}>Privacy</Link>
@@ -911,6 +1238,14 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      <RoleSwitcherModal
+        isOpen={roleModalOpen}
+        onClose={() => setRoleModalOpen(false)}
+        currentRole={selectedRole}
+        actionLabel="Sign In"
+        onRoleChanged={(r) => handleSignInWithRole(r)}
+      />
     </>
   );
 }

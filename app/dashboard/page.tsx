@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession, signOut, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
+import RoleBadgeSwitcher from "@/components/RoleBadgeSwitcher";
+import AppNavbar from "@/components/AppNavbar";
+import { useUserRole } from "@/lib/useUserRole";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid
@@ -17,6 +20,8 @@ interface UserProfile {
   username: string;
   avatar?: string;
   elo: number;
+  role?: "INDIVIDUAL" | "STUDENT" | "FACULTY" | "ADMIN";
+  isAdmin?: boolean;
   wins: number;
   losses: number;
 }
@@ -162,7 +167,7 @@ function ActivityCalendar({ data, joinedDate }: { data: Record<string, number>, 
                   if (isJoinedDay) {
                     text = (
                       <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
-                        <span style={{ color: "#7cff6b", fontWeight: 700 }}>You joined CodeDuel! 🎉</span>
+                        <span style={{ color: "#7cff6b", fontWeight: 700 }}>You joined Codeduel! 🎉</span>
                         <span style={{ color: "rgba(255,255,255,0.7)" }}>
                           {rawCount > 0 ? `${rawCount} submission${rawCount !== 1 ? "s" : ""} · ${dateStr}` : `No submissions · ${dateStr}`}
                         </span>
@@ -266,7 +271,11 @@ export default function Dashboard() {
     }
     return null;
   });
+  const { role: selectedRole, setRole: setSelectedRole } = useUserRole();
   const { matchState, queueDuration, showMatchModal, setShowMatchModal, handleFindMatch, handleCancel } = useMatchmaking();
+  const userElo = profile?.elo ?? 1200;
+  const activeBracketId =
+    userElo < 1100 ? "bracket-1" : userElo < 1400 ? "bracket-2" : "bracket-3";
   const [eloHistory, setEloHistory] = useState<{ label: string; elo: number }[]>(() => {
     if (typeof window !== "undefined") {
       try { return JSON.parse(localStorage.getItem("dash_eloHistory") || "[]"); } catch(e){}
@@ -278,11 +287,16 @@ export default function Dashboard() {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get("action") === "find_match") {
-        setShowMatchModal(true);
+        const trackParam = urlParams.get("track");
+        if (trackParam === "EMBEDDED_SYSTEMS" || trackParam === "PRODUCTION_SWE") {
+          handleFindMatch({ track: trackParam });
+        } else {
+          setShowMatchModal(true);
+        }
         window.history.replaceState(null, "", "/dashboard");
       }
     }
-  }, [setShowMatchModal]);
+  }, [setShowMatchModal, handleFindMatch]);
 
   const [activityData, setActivityData] = useState<Record<string, number>>(() => {
     if (typeof window !== "undefined") {
@@ -306,13 +320,8 @@ export default function Dashboard() {
     }
     return false;
   });
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [selectedProblem, setSelectedProblem] = useState<{id: string, title: string, track?: string} | null>(null);
   const [problemTrackFilter, setProblemTrackFilter] = useState<"ALL" | "PRODUCTION_SWE" | "EMBEDDED_SYSTEMS">("ALL");
-
-  useEffect(() => {
-    if (status === "unauthenticated") router.push("/");
-  }, [status, router]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -324,6 +333,10 @@ export default function Dashboard() {
     .then(([meData, dashData]) => {
       if (meData) {
         setProfile(meData);
+        if (meData.role) {
+          setSelectedRole(meData.role);
+          localStorage.setItem("preferred_role", meData.role);
+        }
         localStorage.setItem("dash_profile", JSON.stringify(meData));
       }
       if (dashData && !dashData.error) {
@@ -380,6 +393,164 @@ export default function Dashboard() {
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
+
+  if (status === "unauthenticated") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#000", color: "#e8e6f0", display: "flex", flexDirection: "column", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+        {/* Navigation */}
+        <header style={{ height: 56, borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 28px", position: "sticky", top: 0, zIndex: 50 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <Link href="/" style={{ color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: "15px" }}>
+              Codeduel
+            </Link>
+            <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "100px", background: "rgba(139,142,255,0.12)", color: "#8b8eff", border: "1px solid rgba(139,142,255,0.25)", fontFamily: "'JetBrains Mono', monospace" }}>
+              1v1 Ranked Arena
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: "16px", alignItems: "center", fontSize: "13px" }}>
+            <Link href="/practice" style={{ color: "#8a8898", textDecoration: "none" }}>Practice Solo</Link>
+            <Link href="/campus" style={{ color: "#8a8898", textDecoration: "none" }}>For Colleges</Link>
+            <Link href="/pricing" style={{ color: "#8a8898", textDecoration: "none" }}>Pricing</Link>
+            <button
+              onClick={() => signIn("github")}
+              style={{
+                background: "#8b8eff",
+                color: "#000",
+                fontWeight: 700,
+                fontSize: "12px",
+                padding: "7px 16px",
+                borderRadius: "6px",
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+              Sign In
+            </button>
+          </div>
+        </header>
+
+        {/* Hero Card */}
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+          <div style={{ maxWidth: "540px", width: "100%", background: "#0a0a10", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "36px 32px", textAlign: "center", boxShadow: "0 20px 50px rgba(0,0,0,0.6)" }}>
+            <div style={{ width: "52px", height: "52px", borderRadius: "14px", background: "rgba(139,142,255,0.12)", border: "1px solid rgba(139,142,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", margin: "0 auto 20px" }}>
+              ⚔️
+            </div>
+            <h1 style={{ fontSize: "24px", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "10px", color: "#fff" }}>
+              Enter the Codeduel Platform
+            </h1>
+            <p style={{ fontSize: "13.5px", color: "#8a8898", lineHeight: 1.5, marginBottom: "20px" }}>
+              Choose your role to customize your workspace, course assignments, and matchmaking.
+            </p>
+
+            {/* Persona Selector for Sign-in */}
+            <div style={{ marginBottom: "20px", textAlign: "left" }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#8b8eff", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px", fontFamily: "'JetBrains Mono', monospace" }}>
+                1. Select Workspace Mode:
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                {[
+                  { id: "STUDENT", label: "Student", icon: "🎓", desc: "Course Labs" },
+                  { id: "FACULTY", label: "Faculty", icon: "🏛️", desc: "Cohort Hub" },
+                  { id: "INDIVIDUAL", label: "Individual", icon: "💻", desc: "Ranked Arena" },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedRole(opt.id as any);
+                      localStorage.setItem("preferred_role", opt.id);
+                    }}
+                    style={{
+                      background: selectedRole === opt.id ? "rgba(139,142,255,0.18)" : "rgba(255,255,255,0.03)",
+                      border: selectedRole === opt.id ? "1px solid #8b8eff" : "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: "8px",
+                      padding: "10px 6px",
+                      color: selectedRole === opt.id ? "#fff" : "#8a8898",
+                      cursor: "pointer",
+                      textAlign: "center",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    <div style={{ fontSize: "18px", marginBottom: "3px" }}>{opt.icon}</div>
+                    <div style={{ fontSize: "12px", fontWeight: 700 }}>{opt.label}</div>
+                    <div style={{ fontSize: "10px", opacity: 0.7, marginTop: "2px" }}>{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <button
+                onClick={() => {
+                  localStorage.setItem("preferred_role", selectedRole);
+                  signIn("github");
+                }}
+                style={{
+                  background: "#8b8eff",
+                  color: "#000",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  padding: "12px 20px",
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                Sign In as {selectedRole === "STUDENT" ? "College Student" : selectedRole === "FACULTY" ? "Faculty / Instructor" : "Individual Dev"} ⚡
+              </button>
+              <Link
+                href="/practice"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "#e8e6f0",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  padding: "11px 20px",
+                  borderRadius: "8px",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                }}
+              >
+                Practice Solo Without Account →
+              </Link>
+            </div>
+            {/* Features preview */}
+            <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", textAlign: "left" }}>
+              <div style={{ fontSize: "12px", color: "#8a8898", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>⚡</span> 12 Production Incidents
+              </div>
+              <div style={{ fontSize: "12px", color: "#8a8898", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>🎯</span> ECE &amp; Cloud SWE Tracks
+              </div>
+              <div style={{ fontSize: "12px", color: "#8a8898", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>📈</span> Calibrated ELO Rating
+              </div>
+              <div style={{ fontSize: "12px", color: "#8a8898", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>🤖</span> Gemini Socratic AI Coach
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const elo = profile?.elo ?? 1200;
   const wins = profile?.wins ?? 0;
@@ -614,70 +785,16 @@ export default function Dashboard() {
         .recharts-yAxis .recharts-text { fill: rgba(255,255,255,0.3) !important; font-size: 11px !important; }
       `}</style>
 
-      {/* NAV */}
-      <nav className="db-nav">
-        <Link href="/" className="db-brand">CodeDuel</Link>
-        <div className="db-nav-links">
-          <Link href="/dashboard" className="db-nav-link active">Dashboard</Link>
-          <Link href="/practice" className="db-nav-link">Solo</Link>
-          <Link href="/leaderboard" className="db-nav-link">Leaderboard</Link>
-          <Link href="/campus" className="db-nav-link">Campus</Link>
-          <Link href="/friends" className="db-nav-link">Friends</Link>
-          <Link href="/profile" className="db-nav-link">Profile</Link>
-        </div>
-        <div className="db-nav-right">
-          {matchState === "queued" ? (
-            <button className="find-btn find-btn-cancel" onClick={handleCancel}>Cancel search</button>
-          ) : (
-            <button className="find-btn find-btn-idle" onClick={() => { setShowMatchModal(true); setSelectedProblem(null); }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-              </svg>
-              Find Match
-            </button>
-          )}
-          
-          <div style={{ position: "relative" }}>
-            <div 
-              className="avatar-btn" 
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              style={{ cursor: "pointer" }}
-            >
-              {session?.user?.image
-                ? <img src={session.user.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : (session?.user?.name?.[0] ?? "?").toUpperCase()
-              }
-            </div>
-            {showProfileMenu && (
-              <div style={{
-                position: "absolute", top: "100%", right: 0, marginTop: 8,
-                background: "var(--bg3)", border: "1px solid rgba(248,113,113,0.3)",
-                borderRadius: 6, overflow: "hidden", zIndex: 50,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.5)"
-              }}>
-                <button
-                  onClick={() => signOut({ callbackUrl: "/" })}
-                  style={{
-                    background: "rgba(248,113,113,0.1)", border: "none", color: "var(--red)",
-                    padding: "10px 16px", cursor: "pointer", width: "100%", whiteSpace: "nowrap",
-                    display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600,
-                    fontFamily: "'JetBrains Mono', monospace", transition: "background 0.15s"
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(248,113,113,0.2)"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = "rgba(248,113,113,0.1)"}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                  </svg>
-                  Sign Out
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
+      {/* NAVBAR */}
+      <AppNavbar
+        activePage="dashboard"
+        onFindMatch={() => {
+          setShowMatchModal(true);
+          setSelectedProblem(null);
+        }}
+        matchState={matchState}
+        onCancelMatch={handleCancel}
+      />
 
       {/* MATCH MODAL */}
       {showMatchModal && (
@@ -688,20 +805,134 @@ export default function Dashboard() {
         }}>
           <div style={{
             background: "var(--bg3)", border: "1px solid var(--border2)",
-            borderRadius: 14, padding: 28, width: "100%", maxWidth: 440,
+            borderRadius: 14, padding: "26px 26px", width: "100%", maxWidth: 490,
             boxShadow: "0 24px 50px rgba(0,0,0,0.6)"
           }}>
             <h2 style={{ fontSize: 20, marginBottom: 6, fontWeight: 700 }}>
-              {selectedProblem ? `Practice: ${selectedProblem.title}` : "Select Engineering Track"}
+              {selectedProblem ? `Practice: ${selectedProblem.title}` : "1v1 Matchmaking & Track Selection"}
             </h2>
-            <p style={{ color: "var(--muted2)", fontSize: 13, marginBottom: 20, lineHeight: 1.4 }}>
-              Race 1v1 against opponents to diagnose tickets, patch multi-file codebases, and pass unit tests.
+            <p style={{ color: "var(--muted2)", fontSize: 13, marginBottom: 16, lineHeight: 1.4 }}>
+              Race 1v1 against opponents to diagnose tickets, patch multi-file codebases, and pass unit tests under pressure.
             </p>
+
+            {/* ELO BRACKET & DIFFICULTY — AUTOMATICALLY DECIDED BASED ON ELO */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Difficulty & ELO Bracket:
+                </span>
+                <span style={{ 
+                  fontSize: 10, 
+                  fontWeight: 700, 
+                  color: "#8b8eff", 
+                  background: "rgba(139,142,255,0.12)", 
+                  border: "1px solid rgba(139,142,255,0.25)",
+                  padding: "2px 8px", 
+                  borderRadius: 100,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4
+                }}>
+                  <span>🔒</span> AUTO-DECIDED BY ELO
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
+                {[
+                  {
+                    id: "bracket-1" as const,
+                    name: "Bracket I — Junior / Intern",
+                    range: "800–1099 ELO",
+                    difficulty: "Beginner",
+                    desc: "Ring buffers & token refresh",
+                    isActive: activeBracketId === "bracket-1",
+                    badge: activeBracketId === "bracket-1" ? "ACTIVE TIER" : "✓ PASSED",
+                  },
+                  {
+                    id: "bracket-2" as const,
+                    name: "Bracket II — Systems Engineer",
+                    range: "1100–1399 ELO",
+                    difficulty: "Intermediate",
+                    desc: "SPI endianness & token bucket limiters",
+                    isActive: activeBracketId === "bracket-2",
+                    badge: activeBracketId === "bracket-2" ? "ACTIVE TIER" : userElo < 1100 ? "REQ 1100+ ELO" : "✓ PASSED",
+                  },
+                  {
+                    id: "bracket-3" as const,
+                    name: "Bracket III — Staff / Principal Triage",
+                    range: "1400+ ELO",
+                    difficulty: "Advanced",
+                    desc: "ARM alignment & deadlock graph retries",
+                    isActive: activeBracketId === "bracket-3",
+                    badge: activeBracketId === "bracket-3" ? "ACTIVE TIER" : "REQ 1400+ ELO",
+                  },
+                ].map((b) => (
+                  <div
+                    key={b.id}
+                    style={{
+                      background: b.isActive ? "linear-gradient(135deg, rgba(139,142,255,0.18) 0%, rgba(139,142,255,0.06) 100%)" : "rgba(255,255,255,0.02)",
+                      border: b.isActive ? "1px solid #8b8eff" : "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 8,
+                      padding: "10px 14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      opacity: b.isActive ? 1 : 0.45,
+                      userSelect: "none",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: b.isActive ? "#fff" : "var(--muted)", whiteSpace: "nowrap" }}>
+                        {b.name}
+                      </span>
+                      <span style={{ 
+                        fontSize: 9.5, 
+                        color: b.isActive ? "#8b8eff" : "var(--muted2)", 
+                        fontWeight: 700,
+                        letterSpacing: "0.03em",
+                        whiteSpace: "nowrap",
+                        padding: "2px 7px",
+                        borderRadius: 4,
+                        background: b.isActive ? "rgba(139,142,255,0.15)" : "transparent",
+                        border: b.isActive ? "1px solid rgba(139,142,255,0.3)" : "none",
+                        flexShrink: 0,
+                      }}>
+                        {b.badge}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 11, color: "var(--muted2)" }}>
+                        {b.range} {b.isActive ? `· Current: ${userElo} ELO` : ""}
+                      </span>
+                      <span style={{ 
+                        fontSize: 9.5, 
+                        padding: "1px 6px", 
+                        borderRadius: 4, 
+                        background: b.isActive ? "rgba(139,142,255,0.25)" : "rgba(255,255,255,0.05)", 
+                        color: b.isActive ? "#c4b5fd" : "var(--muted2)", 
+                        fontWeight: 600, 
+                        whiteSpace: "nowrap" 
+                      }}>
+                        {b.difficulty}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ fontSize: 10.5, color: "var(--muted2)", marginTop: 8, lineHeight: 1.35, display: "flex", alignItems: "center", gap: 5 }}>
+                <span>ℹ️</span> Difficulty is locked to your rating ({userElo} ELO) to prevent smurfing and ensure fair matchmaking.
+              </div>
+            </div>
             
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {/* Option 1: Cloud SWE Track */}
               <button 
-                onClick={() => { setShowMatchModal(false); handleFindMatch({ track: 'PRODUCTION_SWE', challengeId: selectedProblem?.id }); setSelectedProblem(null); }}
+                onClick={() => { 
+                  setShowMatchModal(false); 
+                  handleFindMatch({ track: 'PRODUCTION_SWE', challengeId: selectedProblem?.id }); 
+                  setSelectedProblem(null); 
+                }}
                 style={{
                   background: "rgba(139,142,255,0.12)", color: "#fff", border: "1px solid rgba(139,142,255,0.3)",
                   padding: "12px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
@@ -712,7 +943,7 @@ export default function Dashboard() {
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 18 }}>🌩️</span>
                   <div style={{ textAlign: "left" }}>
-                    <div style={{ fontWeight: 700, color: "var(--indigo)" }}>Track: Cloud SWE</div>
+                    <div style={{ fontWeight: 700, color: "var(--indigo)" }}>Queue Track: Cloud SWE</div>
                     <div style={{ fontSize: 11, color: "var(--muted2)" }}>TypeScript / Node · Race conditions, rate limiters</div>
                   </div>
                 </div>
@@ -721,7 +952,11 @@ export default function Dashboard() {
 
               {/* Option 2: Embedded Systems Track */}
               <button 
-                onClick={() => { setShowMatchModal(false); handleFindMatch({ track: 'EMBEDDED_SYSTEMS', challengeId: selectedProblem?.id }); setSelectedProblem(null); }}
+                onClick={() => { 
+                  setShowMatchModal(false); 
+                  handleFindMatch({ track: 'EMBEDDED_SYSTEMS', challengeId: selectedProblem?.id }); 
+                  setSelectedProblem(null); 
+                }}
                 style={{
                   background: "rgba(251,191,36,0.1)", color: "#fff", border: "1px solid rgba(251,191,36,0.3)",
                   padding: "12px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
@@ -732,7 +967,7 @@ export default function Dashboard() {
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 18 }}>⚡</span>
                   <div style={{ textAlign: "left" }}>
-                    <div style={{ fontWeight: 700, color: "#fbbf24" }}>Track: Embedded Systems</div>
+                    <div style={{ fontWeight: 700, color: "#fbbf24" }}>Queue Track: Embedded Systems</div>
                     <div style={{ fontSize: 11, color: "var(--muted2)" }}>C/C++ · UART ring buffers, ISR wrap-around</div>
                   </div>
                 </div>
@@ -741,7 +976,11 @@ export default function Dashboard() {
 
               {/* Option 3: Instant Demo / Sentinel AI */}
               <button 
-                onClick={() => { setShowMatchModal(false); handleFindMatch({ demo: true, challengeId: selectedProblem?.id, track: selectedProblem?.track as any }); setSelectedProblem(null); }}
+                onClick={() => { 
+                  setShowMatchModal(false); 
+                  handleFindMatch({ demo: true, challengeId: selectedProblem?.id, track: selectedProblem?.track as any }); 
+                  setSelectedProblem(null); 
+                }}
                 style={{
                   background: "rgba(74,222,128,0.1)", color: "#fff", border: "1px solid rgba(74,222,128,0.3)",
                   padding: "12px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
@@ -752,7 +991,7 @@ export default function Dashboard() {
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span style={{ fontSize: 18 }}>🤖</span>
                   <div style={{ textAlign: "left" }}>
-                    <div style={{ fontWeight: 700, color: "var(--green)" }}>Instant Match vs Mock Bot</div>
+                    <div style={{ fontWeight: 700, color: "var(--green)" }}>Instant Match vs CodeSentinel AI</div>
                     <div style={{ fontSize: 11, color: "var(--muted2)" }}>Simulates opponent passing tests over 40s (Demo Safe)</div>
                   </div>
                 </div>
@@ -846,6 +1085,317 @@ export default function Dashboard() {
             {!isLoaded ? <div className="skeleton" style={{ width: 40, height: 24 }}></div> : <span className="elo-val">{elo}</span>}
           </div>
         </div>
+
+        {/* Role-tailored action banner */}
+        {selectedRole === "ADMIN" ? (
+          <div style={{
+            background: "linear-gradient(135deg, rgba(244,63,94,0.12) 0%, rgba(225,29,72,0.04) 100%)",
+            border: "1px solid rgba(244,63,94,0.35)",
+            borderRadius: 12,
+            padding: "16px 20px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+            boxShadow: "0 0 24px rgba(244,63,94,0.08)",
+          }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 13 }}>⚡</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#f43f5e", textTransform: "uppercase", letterSpacing: 0.8, fontFamily: "'JetBrains Mono', monospace" }}>
+                  Platform Administrator / Root Mode Active
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: "#e8e6f0", fontWeight: 600 }}>
+                Root operator privileges active: monitor database cluster telemetry, inspect all cohorts, or test features from any persona.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Link
+                href="/admin/metrics"
+                style={{
+                  background: "linear-gradient(135deg, #f43f5e, #e11d48)",
+                  border: "none",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  boxShadow: "0 0 12px rgba(244,63,94,0.3)",
+                }}
+              >
+                <span>📊</span> Live Telemetry &amp; Metrics →
+              </Link>
+              <Link
+                href="/campus"
+                style={{
+                  background: "rgba(56,189,248,0.15)",
+                  border: "1px solid rgba(56,189,248,0.35)",
+                  color: "#38bdf8",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span>🏛️</span> Global Campus Hub
+              </Link>
+              <Link
+                href="/practice"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span>⚡</span> Solo Practice
+              </Link>
+            </div>
+          </div>
+        ) : selectedRole === "STUDENT" ? (
+          <div style={{
+            background: "linear-gradient(135deg, rgba(74,222,128,0.08) 0%, rgba(139,142,255,0.05) 100%)",
+            border: "1px solid rgba(74,222,128,0.25)",
+            borderRadius: 12,
+            padding: "16px 20px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+          }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 13 }}>🎓</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: 0.8, fontFamily: "'JetBrains Mono', monospace" }}>
+                  College Student Mode Active
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: "#e8e6f0", fontWeight: 600 }}>
+                Practice dedicated solo bug triage tickets, enter peer duels, or submit university labs.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Link
+                href="/practice"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>⚡</span> Solo Practice
+              </Link>
+              <button
+                onClick={() => { setShowMatchModal(true); setSelectedProblem(null); }}
+                style={{
+                  background: "#8b8eff",
+                  border: "none",
+                  color: "#000",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>⚔️</span> 1v1 Peer Duel
+              </button>
+              <Link
+                href="/campus"
+                style={{
+                  background: "rgba(74,222,128,0.15)",
+                  border: "1px solid rgba(74,222,128,0.35)",
+                  color: "#4ade80",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>🏫</span> Campus Cohorts & Labs →
+              </Link>
+            </div>
+          </div>
+        ) : selectedRole === "FACULTY" ? (
+          <div style={{
+            background: "linear-gradient(135deg, rgba(56,189,248,0.08) 0%, rgba(139,142,255,0.05) 100%)",
+            border: "1px solid rgba(56,189,248,0.25)",
+            borderRadius: 12,
+            padding: "16px 20px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+          }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 13 }}>🏛️</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#38bdf8", textTransform: "uppercase", letterSpacing: 0.8, fontFamily: "'JetBrains Mono', monospace" }}>
+                  Faculty &amp; Instructor Command Center
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: "#e8e6f0", fontWeight: 600 }}>
+                Manage student cohorts, schedule incident lab assignments, and export autograded gradebooks.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Link
+                href="/campus"
+                style={{
+                  background: "#38bdf8",
+                  border: "none",
+                  color: "#000",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>🏛️</span> Open Campus Command Center →
+              </Link>
+              <Link
+                href="/practice"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>📋</span> Problem Sandbox
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            background: "linear-gradient(135deg, rgba(139,142,255,0.08) 0%, rgba(255,255,255,0.02) 100%)",
+            border: "1px solid rgba(139,142,255,0.2)",
+            borderRadius: 12,
+            padding: "16px 20px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+          }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 13 }}>💻</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#8b8eff", textTransform: "uppercase", letterSpacing: 0.8, fontFamily: "'JetBrains Mono', monospace" }}>
+                  Individual Developer Arena
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: "#e8e6f0", fontWeight: 600 }}>
+                Ranked 1v1 matchmaking with calibrated ELO brackets, solo incident practice, and friends.
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Link
+                href="/practice"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>⚡</span> Solo Practice
+              </Link>
+              <button
+                onClick={() => { setShowMatchModal(true); setSelectedProblem(null); }}
+                style={{
+                  background: "#8b8eff",
+                  border: "none",
+                  color: "#000",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>⚔️</span> Find Match
+              </button>
+              <Link
+                href="/leaderboard"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>🏆</span> Leaderboard
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* ELO History Chart */}
         <div className="card">

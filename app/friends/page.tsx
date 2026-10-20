@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession, signOut, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
+import RoleBadgeSwitcher from "@/components/RoleBadgeSwitcher";
+import AppNavbar from "@/components/AppNavbar";
 
 export default function FriendsPage() {
   const { data: session, status } = useSession();
@@ -37,10 +39,6 @@ export default function FriendsPage() {
     if (typeof window !== "undefined") return !!localStorage.getItem("friends_friends");
     return false;
   });
-
-  useEffect(() => {
-    if (status === "unauthenticated") router.push("/");
-  }, [status, router]);
 
   const loadFriends = async () => {
     try {
@@ -123,7 +121,7 @@ export default function FriendsPage() {
     });
     const d = await res.json();
     if (res.ok) {
-      setMsg({ text: "Request sent!", type: "success" });
+      setMsg({ text: d.message || "Request sent!", type: "success" });
       setAddUsername("");
       loadFriends();
     } else {
@@ -164,6 +162,85 @@ export default function FriendsPage() {
   };
 
   if (status === "loading") return null;
+
+  if (status === "unauthenticated") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#000", color: "#e8e6f0", display: "flex", flexDirection: "column", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+        <header style={{ height: 56, borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(0,0,0,0.85)", backdropFilter: "blur(20px)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 28px", position: "sticky", top: 0, zIndex: 50 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <Link href="/" style={{ color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: "15px" }}>
+              Codeduel
+            </Link>
+            <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "100px", background: "rgba(139,142,255,0.12)", color: "#8b8eff", border: "1px solid rgba(139,142,255,0.25)", fontFamily: "'JetBrains Mono', monospace" }}>
+              Friends &amp; Duels
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: "16px", alignItems: "center", fontSize: "13px" }}>
+            <Link href="/practice" style={{ color: "#8a8898", textDecoration: "none" }}>Practice Solo</Link>
+            <Link href="/leaderboard" style={{ color: "#8a8898", textDecoration: "none" }}>Leaderboard</Link>
+            <Link href="/pricing" style={{ color: "#8a8898", textDecoration: "none" }}>Pricing</Link>
+          </div>
+        </header>
+
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+          <div style={{ maxWidth: "520px", width: "100%", background: "#0a0a10", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "36px 32px", textAlign: "center", boxShadow: "0 20px 50px rgba(0,0,0,0.6)" }}>
+            <div style={{ width: "52px", height: "52px", borderRadius: "14px", background: "rgba(139,142,255,0.12)", border: "1px solid rgba(139,142,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", margin: "0 auto 20px" }}>
+              👥
+            </div>
+            <h1 style={{ fontSize: "24px", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "10px", color: "#fff" }}>
+              Friends &amp; Direct Duels
+            </h1>
+            <p style={{ fontSize: "14px", color: "#8a8898", lineHeight: 1.6, marginBottom: "28px" }}>
+              Sign in with your GitHub account to connect with peers, challenge friends directly to 1v1 incident firefights, and compare head-to-head match records.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <button
+                onClick={() => signIn("github")}
+                style={{
+                  background: "#8b8eff",
+                  color: "#000",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  padding: "12px 20px",
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                Sign In with GitHub ⚡
+              </button>
+              <Link
+                href="/practice"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "#e8e6f0",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  padding: "11px 20px",
+                  borderRadius: "8px",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                }}
+              >
+                Practice Solo Without Account →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -237,63 +314,12 @@ export default function FriendsPage() {
           border-radius: 4px;
         }
       `}</style>
-      <nav className="db-nav">
-        <Link href="/" style={{ fontSize: 14, fontWeight: 700, textDecoration: "none", color: "#fff" }}>CodeDuel</Link>
-        <div className="db-nav-links">
-          <Link href="/dashboard" className="db-nav-link">Dashboard</Link>
-          <Link href="/leaderboard" className="db-nav-link">Leaderboard</Link>
-          <Link href="/friends" className="db-nav-link active">Friends</Link>
-          <Link href="/profile" className="db-nav-link">Profile</Link>
-        </div>
-        <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 10 }}>
-          {matchState === "queued" ? (
-            <button className="find-btn find-btn-cancel" onClick={handleCancel}>Cancel search</button>
-          ) : (
-            <button className="find-btn find-btn-idle" onClick={() => setShowMatchModal(true)}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-              </svg>
-              Find Match
-            </button>
-          )}
-          <div 
-            style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--muted)", overflow: "hidden", cursor: "pointer" }}
-            onClick={() => setShowProfileMenu(!showProfileMenu)}
-          >
-            {session?.user?.image
-              ? <img src={session.user.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : <span style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 12 }}>{(session?.user?.name?.[0] ?? "?").toUpperCase()}</span>
-            }
-          </div>
-          {showProfileMenu && (
-            <div style={{
-              position: "absolute", top: "100%", right: 0, marginTop: 12,
-              background: "var(--bg3)", border: "1px solid rgba(248,113,113,0.3)",
-              borderRadius: 6, overflow: "hidden", zIndex: 50,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.5)"
-            }}>
-              <button
-                onClick={() => signOut({ callbackUrl: "/" })}
-                style={{
-                  background: "rgba(248,113,113,0.1)", border: "none", color: "var(--red)",
-                  padding: "10px 16px", cursor: "pointer", width: "100%", whiteSpace: "nowrap",
-                  display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600,
-                  fontFamily: "'JetBrains Mono', monospace", transition: "background 0.15s"
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(248,113,113,0.2)"}
-                onMouseLeave={(e) => e.currentTarget.style.background = "rgba(248,113,113,0.1)"}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                  <polyline points="16 17 21 12 16 7"></polyline>
-                  <line x1="21" y1="12" x2="9" y2="12"></line>
-                </svg>
-                Sign Out
-              </button>
-            </div>
-          )}
-        </div>
-      </nav>
+      <AppNavbar
+        activePage="friends"
+        onFindMatch={() => setShowMatchModal(true)}
+        matchState={matchState}
+        onCancelMatch={handleCancel}
+      />
 
       {/* MATCH MODAL */}
       {showMatchModal && (

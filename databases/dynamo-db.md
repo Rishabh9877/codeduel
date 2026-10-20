@@ -1,4 +1,4 @@
-# CodeDuel — DynamoDB Single-Table Design
+# Codeduel — DynamoDB Single-Table Design
 # Table name: CodeDuelTable
 # Region: eu-north-1
 # Capacity: On-demand

@@ -8,8 +8,26 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 export const dynamic = "force-dynamic";
 
+const practiceRateLimit = new Map<string, { count: number; resetAt: number }>();
+
 export async function POST(req: Request) {
   try {
+    const forwarded = req.headers.get("x-forwarded-for");
+    const clientIp = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+
+    const now = Date.now();
+    const entry = practiceRateLimit.get(clientIp);
+    if (!entry || now > entry.resetAt) {
+      practiceRateLimit.set(clientIp, { count: 1, resetAt: now + 60000 });
+    } else if (entry.count >= 20) {
+      return NextResponse.json(
+        { error: "Too many code execution requests. Please pause for a few seconds before testing again." },
+        { status: 429 }
+      );
+    } else {
+      entry.count++;
+    }
+
     const body = await req.json();
     const { challengeId, files, isDaily } = body;
 

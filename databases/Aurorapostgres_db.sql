@@ -1,5 +1,5 @@
 -- =============================================================================
--- CodeDuel — Aurora PostgreSQL Schema
+-- Codeduel — Aurora PostgreSQL Schema
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";

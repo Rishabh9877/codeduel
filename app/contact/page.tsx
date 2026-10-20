@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import AppNavbar from "@/components/AppNavbar";
 
 export default function ContactPage() {
   const [form, setForm] = useState({
@@ -26,31 +27,7 @@ export default function ContactPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#050508", color: "#f5f4f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
       {/* NAVIGATION */}
-      <nav
-        style={{
-          height: "56px",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 28px",
-          background: "rgba(0,0,0,0.85)",
-          backdropFilter: "blur(20px)",
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        <Link href="/" style={{ textDecoration: "none", color: "#fff", fontWeight: 800, fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-          Code<span style={{ color: "#8b8eff" }}>Duel</span>
-        </Link>
-        <div style={{ display: "flex", gap: "20px", fontSize: "13px" }}>
-          <Link href="/practice" style={{ color: "#8a8898", textDecoration: "none" }}>Practice</Link>
-          <Link href="/campus" style={{ color: "#8a8898", textDecoration: "none" }}>Campus</Link>
-          <Link href="/pricing" style={{ color: "#8a8898", textDecoration: "none" }}>Pricing</Link>
-          <Link href="/about" style={{ color: "#8a8898", textDecoration: "none" }}>About</Link>
-        </div>
-      </nav>
+      <AppNavbar />
 
       {/* CONTENT */}
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "60px 24px 100px" }}>
@@ -59,7 +36,7 @@ export default function ContactPage() {
             Get In Touch
           </span>
           <h1 style={{ fontSize: "36px", fontWeight: 800, color: "#fff", margin: "10px 0 8px", letterSpacing: "-0.03em" }}>
-            Contact CodeDuel
+            Contact Codeduel
           </h1>
           <p style={{ fontSize: "15px", color: "#8a8898", margin: 0, lineHeight: 1.5 }}>
             Whether you want to deploy Campus Mode in your university lab, report an engineering incident, or explore placement partnerships, our team is here to assist.
@@ -74,7 +51,7 @@ export default function ContactPage() {
                 <div style={{ fontSize: "36px", marginBottom: "12px" }}>📬</div>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#fff", margin: "0 0 8px" }}>Message Received</h3>
                 <p style={{ fontSize: "13px", color: "#8a8898", lineHeight: 1.6, margin: "0 0 20px" }}>
-                  Thank you for reaching out. A member of the CodeDuel engineering and campus team will respond within 24 hours.
+                  Thank you for reaching out. A member of the Codeduel engineering and campus team will respond within 24 hours.
                 </p>
                 <button
                   onClick={() => { setSubmitted(false); setForm({ name: "", email: "", category: "campus_pilot", institution: "", message: "" }); }}
@@ -127,7 +104,7 @@ export default function ContactPage() {
                     type="email"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="name@pec.edu.in"
+                    placeholder="name@university.edu"
                     style={{
                       width: "100%",
                       background: "rgba(0,0,0,0.4)",
@@ -176,7 +153,7 @@ export default function ContactPage() {
                     type="text"
                     value={form.institution}
                     onChange={(e) => setForm({ ...form, institution: e.target.value })}
-                    placeholder="e.g. Punjab Engineering College"
+                    placeholder="e.g. Stanford, MIT, IIT, Berkeley, or Company"
                     style={{
                       width: "100%",
                       background: "rgba(0,0,0,0.4)",
@@ -242,13 +219,13 @@ export default function ContactPage() {
           <div>
             <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "24px", marginBottom: "20px" }}>
               <div style={{ fontSize: "12px", fontWeight: 700, color: "#8b8eff", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>
-                Campus Headquarters
+                Global Headquarters
               </div>
-              <h4 style={{ fontSize: "15px", fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>CodeDuel Lab</h4>
+              <h4 style={{ fontSize: "15px", fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>Codeduel Inc.</h4>
               <p style={{ fontSize: "13px", color: "#8a8898", lineHeight: 1.6, margin: 0 }}>
-                Punjab Engineering College (PEC)<br />
-                Sector 12, Chandigarh 160012<br />
-                India
+                Engineering Division &amp; Academic Partnerships<br />
+                Global Remote · Silicon Valley &amp; Partner Campuses<br />
+                Worldwide
               </p>
             </div>
 

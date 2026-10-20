@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { ScanCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { STARTING_ELO } from "@/lib/elo";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export async function GET(
     }
 
     const userId = userProfile.userId;
-    const currentElo = Number(userProfile.elo ?? 1200);
+    const currentElo = Number(userProfile.elo ?? STARTING_ELO);
     const wins = Number(userProfile.wins ?? 0);
     const losses = Number(userProfile.losses ?? 0);
     const totalMatches = wins + losses;
@@ -131,7 +132,6 @@ export async function GET(
 
     return NextResponse.json({
       isPrivate: false,
-      userId,
       username: userProfile.username,
       avatar: userProfile.avatar ?? null,
       githubUrl: `https://github.com/${userProfile.username}`,

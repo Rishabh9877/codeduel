@@ -1,4 +1,4 @@
-# CodeDuel — 1v1 Dynamic Software & ECE Engineering Duels
+# Codeduel — 1v1 Dynamic Software & ECE Engineering Duels
 
 > *"We train students and developers through 1v1 dynamic software and ECE duels."*
 
@@ -8,15 +8,15 @@
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL%20%2F%20DynamoDB-336791?logo=postgresql)](https://neon.tech/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-**CodeDuel** is a competitive engineering platform that bridges the massive gap between textbook algorithm memorization (LeetCode/DSA) and real-world production engineering. 
+**Codeduel** is a competitive engineering platform that bridges the massive gap between textbook algorithm memorization (LeetCode/DSA) and real-world production engineering.
 
 Instead of inverting binary trees, engineers race head-to-head in real time to diagnose, trace, and patch authentic bugs across production multi-file codebases in **Cloud Systems (TypeScript / Python)** and **Embedded Firmware (C / Bare-Metal Hardware)**.
 
 ---
 
-## ⚡ The CodeDuel Advantage
+## ⚡ The Codeduel Advantage
 
-| Metric | Traditional DSA Platforms | CodeDuel Battleground |
+| Metric | Traditional DSA Platforms | Codeduel Battleground |
 |---|---|---|
 | **Problem Domain** | Textbook arrays, graph traversal, dynamic programming | Production systems, race conditions, memory leaks, register flags |
 | **Code Structure** | Single-function sandbox with synthetic inputs | Multi-file modular architecture (`.h`, `.c`, `.ts`, types, test runner) |
@@ -148,7 +148,7 @@ PISTON_URL=https://emkc.org/api/v2/piston
 ```
 
 ### 3. Run Automated Test Suites
-CodeDuel includes built-in verification scripts for all game logic:
+Codeduel includes built-in verification scripts for all game logic:
 
 ```bash
 # Run ELO algorithm unit tests (7 test cases, floor protection, probability symmetry)

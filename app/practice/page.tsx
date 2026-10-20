@@ -3,6 +3,8 @@
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
+import RoleBadgeSwitcher from "@/components/RoleBadgeSwitcher";
+import AppNavbar from "@/components/AppNavbar";
 
 interface ChallengeItem {
   id: string;
@@ -16,6 +18,7 @@ interface ChallengeItem {
   difficulty: "easy" | "medium" | "hard";
   estimatedMinutes: number;
   skills: string[];
+  category?: "solo" | "duo" | "both";
   hiddenTestsCount?: number;
   hasHardwareSimulation?: boolean;
 }
@@ -34,6 +37,7 @@ export default function PracticeCatalogPage() {
   const [loading, setLoading] = useState(true);
 
   // Filters
+  const [catalogScope, setCatalogScope] = useState<"solo" | "all">("solo");
   const [trackFilter, setTrackFilter] = useState<"ALL" | "PRODUCTION_SWE" | "EMBEDDED_SYSTEMS">("ALL");
   const [langFilter, setLangFilter] = useState<"ALL" | "typescript" | "c" | "python">("ALL");
   const [difficultyFilter, setDifficultyFilter] = useState<"ALL" | "easy" | "medium" | "hard">("ALL");
@@ -41,8 +45,10 @@ export default function PracticeCatalogPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
+    setLoading(true);
+    const url = catalogScope === "solo" ? "/api/challenges?mode=solo" : "/api/challenges";
     Promise.all([
-      fetch("/api/challenges").then((r) => r.json()),
+      fetch(url).then((r) => r.json()),
       fetch("/api/practice/daily").then((r) => r.json()),
     ])
       .then(([chalData, dailyData]) => {
@@ -51,7 +57,7 @@ export default function PracticeCatalogPage() {
       })
       .catch((err) => console.error("Failed to load practice data:", err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [catalogScope]);
 
   // Compute all available unique skills
   const allSkills = useMemo(() => {
@@ -168,17 +174,17 @@ export default function PracticeCatalogPage() {
 
         /* DAILY BANNER */
         .daily-banner {
-          background: linear-gradient(135deg, rgba(139, 142, 255, 0.1) 0%, rgba(56, 189, 248, 0.04) 100%);
-          border: 1px solid rgba(139, 142, 255, 0.28);
-          border-radius: 14px;
-          padding: 24px 28px;
-          margin-bottom: 36px;
+          background: linear-gradient(135deg, rgba(139, 142, 255, 0.08) 0%, rgba(56, 189, 248, 0.03) 100%);
+          border: 1px solid rgba(139, 142, 255, 0.22);
+          border-radius: 12px;
+          padding: 18px 22px;
+          margin-bottom: 24px;
           position: relative;
           overflow: hidden;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 24px;
+          gap: 20px;
           flex-wrap: wrap;
         }
 
@@ -186,41 +192,40 @@ export default function PracticeCatalogPage() {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          background: rgba(139, 142, 255, 0.15);
-          border: 1px solid rgba(139, 142, 255, 0.3);
+          background: rgba(139, 142, 255, 0.12);
+          border: 1px solid rgba(139, 142, 255, 0.25);
           border-radius: 100px;
-          padding: 3px 10px;
-          font-size: 11px;
+          padding: 2px 9px;
+          font-size: 10px;
           font-family: "JetBrains Mono", monospace;
           color: var(--accent);
-          font-weight: 600;
-          margin-bottom: 8px;
+          font-weight: 700;
         }
 
         .streak-pill {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          background: rgba(251, 191, 36, 0.12);
-          border: 1px solid rgba(251, 191, 36, 0.28);
+          background: rgba(251, 191, 36, 0.1);
+          border: 1px solid rgba(251, 191, 36, 0.25);
           color: #fde047;
           border-radius: 100px;
-          padding: 4px 12px;
-          font-size: 12px;
+          padding: 3px 10px;
+          font-size: 11px;
           font-weight: 600;
           font-family: "JetBrains Mono", monospace;
         }
 
         /* FILTER BAR */
         .filter-section {
-          background: var(--bg2);
-          border: 1px solid var(--border);
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.06);
           border-radius: 12px;
-          padding: 18px 20px;
-          margin-bottom: 32px;
+          padding: 14px 18px;
+          margin-bottom: 28px;
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 12px;
         }
 
         .filter-row {
@@ -382,56 +387,7 @@ export default function PracticeCatalogPage() {
       `}</style>
 
       {/* TOP NAVIGATION */}
-      <nav className="practice-nav">
-        <Link href="/" className="practice-brand">
-          <div
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: 6,
-              background: "linear-gradient(135deg, #8b8eff 0%, #7c3aed 100%)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 12,
-              fontWeight: 800,
-              color: "#000",
-            }}
-          >
-            ⚡
-          </div>
-          <span>CodeDuel</span>
-          <span
-            style={{
-              fontSize: 10,
-              background: "rgba(255,255,255,0.06)",
-              padding: "2px 6px",
-              borderRadius: 4,
-              color: "#8a8898",
-            }}
-          >
-            SOLO
-          </span>
-        </Link>
-
-        <div className="practice-nav-links">
-          <Link href="/practice" className="practice-nav-link active">
-            Practice
-          </Link>
-          <Link href="/dashboard" className="practice-nav-link">
-            1v1 Arena
-          </Link>
-          <Link href="/leaderboard" className="practice-nav-link">
-            Leaderboard
-          </Link>
-          <Link href="/campus" className="practice-nav-link">
-            Campus
-          </Link>
-          <Link href="/profile" className="practice-nav-link">
-            Profile
-          </Link>
-        </div>
-      </nav>
+      <AppNavbar activePage="practice" />
 
       <main className="practice-main">
         {/* HEADER */}
@@ -465,18 +421,18 @@ export default function PracticeCatalogPage() {
         {daily && daily.challenge && (
           <div className="daily-banner">
             <div style={{ flex: 1, minWidth: 280 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
                 <span className="daily-badge">📅 DAILY CHALLENGE · {daily.date}</span>
                 {daily.completedToday ? (
                   <span
                     style={{
-                      background: "rgba(74,222,128,0.15)",
+                      background: "rgba(74,222,128,0.12)",
                       color: "#4ade80",
-                      border: "1px solid rgba(74,222,128,0.3)",
+                      border: "1px solid rgba(74,222,128,0.25)",
                       borderRadius: 100,
-                      padding: "2px 10px",
-                      fontSize: 11,
-                      fontWeight: 600,
+                      padding: "2px 9px",
+                      fontSize: 10,
+                      fontWeight: 700,
                     }}
                   >
                     ✓ Completed Today
@@ -484,13 +440,13 @@ export default function PracticeCatalogPage() {
                 ) : (
                   <span
                     style={{
-                      background: "rgba(56,189,248,0.15)",
+                      background: "rgba(56,189,248,0.12)",
                       color: "#38bdf8",
-                      border: "1px solid rgba(56,189,248,0.3)",
+                      border: "1px solid rgba(56,189,248,0.25)",
                       borderRadius: 100,
-                      padding: "2px 10px",
-                      fontSize: 11,
-                      fontWeight: 600,
+                      padding: "2px 9px",
+                      fontSize: 10,
+                      fontWeight: 700,
                     }}
                   >
                     ⚡ Unsolved Today
@@ -498,10 +454,10 @@ export default function PracticeCatalogPage() {
                 )}
                 <span className="streak-pill">🔥 {daily.streak} Day Streak</span>
               </div>
-              <h2 style={{ fontSize: "20px", fontWeight: 700, margin: "0 0 8px", color: "#fff" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 6px", color: "#fff" }}>
                 {daily.challenge.title}
               </h2>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <span
                   className={`badge ${
                     daily.challenge.track === "PRODUCTION_SWE" ? "badge-swe" : "badge-embedded"
@@ -513,33 +469,27 @@ export default function PracticeCatalogPage() {
                   {daily.challenge.difficulty}
                 </span>
                 <span style={{ fontSize: 12, color: "var(--muted)", fontFamily: "JetBrains Mono" }}>
-                  ~{daily.challenge.estimatedMinutes} mins · {daily.challenge.totalTests} tests · {daily.challenge.language}
+                  ~{daily.challenge.estimatedMinutes}m · {daily.challenge.totalTests} tests · {daily.challenge.language}
                 </span>
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {(daily.challenge.skills || []).map((sk) => (
-                  <span key={sk} className="skill-chip">
-                    {sk}
-                  </span>
-                ))}
               </div>
             </div>
 
-            <div>
+            <div style={{ flexShrink: 0 }}>
               <Link
                 href={`/practice/${daily.challenge.id}?daily=1`}
                 style={{
                   background: "#8b8eff",
                   color: "#000",
-                  padding: "12px 24px",
+                  padding: "10px 20px",
                   borderRadius: "8px",
                   fontWeight: 700,
-                  fontSize: "14px",
+                  fontSize: "13px",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 8,
                   textDecoration: "none",
-                  boxShadow: "0 4px 20px rgba(139,142,255,0.3)",
+                  boxShadow: "0 2px 14px rgba(139,142,255,0.25)",
+                  transition: "all 0.15s ease",
                 }}
               >
                 <span>Launch Daily</span>
@@ -551,6 +501,32 @@ export default function PracticeCatalogPage() {
 
         {/* FILTER BAR */}
         <div className="filter-section">
+          {/* Scope Selector: Solo Practice vs All Arena Problems */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.06)", flexWrap: "wrap", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#e0e1ff", letterSpacing: "0.03em", textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace" }}>
+                Problem Mode:
+              </span>
+              <button
+                className={`filter-btn ${catalogScope === "solo" ? "active" : ""}`}
+                onClick={() => setCatalogScope("solo")}
+                style={{ fontWeight: 600 }}
+              >
+                🎯 Dedicated Solo Practice ({catalogScope === "solo" ? challenges.length : "6"} Tickets)
+              </button>
+              <button
+                className={`filter-btn ${catalogScope === "all" ? "active" : ""}`}
+                onClick={() => setCatalogScope("all")}
+                style={{ fontWeight: 600 }}
+              >
+                🌐 All Platform Challenges
+              </button>
+            </div>
+            <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+              {catalogScope === "solo" ? "Showing distinct practice incidents isolated from 1v1 duels" : "Showing all 1v1 and practice incidents"}
+            </span>
+          </div>
+
           {/* Row 1: Track & Search */}
           <div className="filter-row">
             <div className="filter-group">
@@ -584,47 +560,65 @@ export default function PracticeCatalogPage() {
             />
           </div>
 
-          {/* Row 2: Language, Difficulty, Skill tag */}
-          <div className="filter-row">
+          {/* Row 2: ELO Bracket & Language / Skills */}
+          <div className="filter-row" style={{ paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.04)" }}>
             <div className="filter-group">
-              <span style={{ fontSize: 12, color: "var(--muted)", marginRight: 4, fontWeight: 600 }}>Language:</span>
-              {(["ALL", "typescript", "c", "python"] as const).map((lang) => (
-                <button
-                  key={lang}
-                  className={`filter-btn ${langFilter === lang ? "active" : ""}`}
-                  onClick={() => setLangFilter(lang)}
-                >
-                  {lang === "ALL" ? "All" : lang.toUpperCase()}
-                </button>
-              ))}
+              <span style={{ fontSize: 12, color: "var(--muted)", marginRight: 4, fontWeight: 600 }}>ELO Bracket:</span>
+              <button
+                className={`filter-btn ${difficultyFilter === "ALL" ? "active" : ""}`}
+                onClick={() => setDifficultyFilter("ALL")}
+              >
+                All Brackets
+              </button>
+              <button
+                className={`filter-btn ${difficultyFilter === "easy" ? "active" : ""}`}
+                onClick={() => setDifficultyFilter("easy")}
+                title="Bracket I — Junior / Intern (800–1099 ELO | Beginner)"
+              >
+                Bracket I (800–1099 ELO)
+              </button>
+              <button
+                className={`filter-btn ${difficultyFilter === "medium" ? "active" : ""}`}
+                onClick={() => setDifficultyFilter("medium")}
+                title="Bracket II — Systems Engineer (1100–1399 ELO | Intermediate)"
+              >
+                Bracket II (1100–1399 ELO)
+              </button>
+              <button
+                className={`filter-btn ${difficultyFilter === "hard" ? "active" : ""}`}
+                onClick={() => setDifficultyFilter("hard")}
+                title="Bracket III — Staff / Principal Triage (1400+ ELO | Advanced)"
+              >
+                Bracket III (1400+ ELO)
+              </button>
             </div>
 
-            <div className="filter-group">
-              <span style={{ fontSize: 12, color: "var(--muted)", marginRight: 4, fontWeight: 600 }}>Difficulty:</span>
-              {(["ALL", "easy", "medium", "hard"] as const).map((diff) => (
-                <button
-                  key={diff}
-                  className={`filter-btn ${difficultyFilter === diff ? "active" : ""}`}
-                  onClick={() => setDifficultyFilter(diff)}
-                >
-                  {diff.toUpperCase()}
-                </button>
-              ))}
-            </div>
-
-            {allSkills.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div className="filter-group">
-                <span style={{ fontSize: 12, color: "var(--muted)", marginRight: 4, fontWeight: 600 }}>Skill:</span>
-                <select
-                  value={selectedSkill}
-                  onChange={(e) => setSelectedSkill(e.target.value)}
-                  style={{
-                    background: "var(--bg3)",
-                    border: "1px solid var(--border)",
-                    color: "var(--text)",
-                    padding: "5px 10px",
-                    borderRadius: 6,
-                    fontSize: 12,
+                <span style={{ fontSize: 12, color: "var(--muted)", marginRight: 4, fontWeight: 600 }}>Language:</span>
+                {(["ALL", "typescript", "c", "python"] as const).map((lang) => (
+                  <button
+                    key={lang}
+                    className={`filter-btn ${langFilter === lang ? "active" : ""}`}
+                    onClick={() => setLangFilter(lang)}
+                  >
+                    {lang === "ALL" ? "All" : lang === "typescript" ? "TS" : lang.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
+              {allSkills.length > 0 && (
+                <div className="filter-group">
+                  <select
+                    value={selectedSkill}
+                    onChange={(e) => setSelectedSkill(e.target.value)}
+                    style={{
+                      background: "var(--bg3)",
+                      border: "1px solid var(--border)",
+                      color: "var(--text)",
+                      padding: "6px 12px",
+                      borderRadius: 8,
+                      fontSize: 12,
                     outline: "none",
                   }}
                 >
@@ -639,8 +633,9 @@ export default function PracticeCatalogPage() {
             )}
           </div>
         </div>
+      </div>
 
-        {/* CATALOG GRID */}
+      {/* CATALOG GRID */}
         {loading ? (
           <div style={{ textAlign: "center", padding: "60px 0", color: "var(--muted)" }}>
             Loading challenge catalog...
@@ -721,12 +716,17 @@ export default function PracticeCatalogPage() {
                     📦 {c.repoContext}
                   </div>
 
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 18 }}>
-                    {(c.skills || []).map((sk) => (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 16, alignItems: "center" }}>
+                    {(c.skills || []).slice(0, 2).map((sk) => (
                       <span key={sk} className="skill-chip">
                         {sk}
                       </span>
                     ))}
+                    {(c.skills || []).length > 2 && (
+                      <span style={{ fontSize: 10, color: "var(--muted)", fontFamily: "'JetBrains Mono', monospace" }}>
+                        +{c.skills.length - 2} more
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -760,7 +760,7 @@ export default function PracticeCatalogPage() {
         {/* PRACTICE FOOTER */}
         <div style={{ marginTop: 64, paddingTop: 28, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, fontSize: 12, color: "var(--muted2)" }}>
           <div>
-            CodeDuel Solo Practice Arena · Punjab Engineering College (PEC)
+            Codeduel Solo Practice Arena · Production Incident Triage &amp; Socratic Learning
           </div>
           <div style={{ display: "flex", gap: 20 }}>
             <Link href="/about" style={{ color: "var(--muted)", textDecoration: "none" }}>About</Link>

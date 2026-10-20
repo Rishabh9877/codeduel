@@ -2,8 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import type { Cohort, CohortAssignment, CohortStudent } from "@/lib/campus";
+import { useSession, signIn } from "next-auth/react";
+import type { Cohort, CohortAssignment, CohortStudent, CohortSubmission, CohortStats } from "@/lib/campus-data";
+import { getDemoCohorts, SEEDED_COHORTS } from "@/lib/campus-data";
+import RoleBadgeSwitcher from "@/components/RoleBadgeSwitcher";
+import type { UserRole } from "@/components/RoleSwitcherModal";
+import AppNavbar from "@/components/AppNavbar";
+import { useUserRole } from "@/lib/useUserRole";
 
 const AVAILABLE_CHALLENGES = [
   { id: "embedded-ring-buffer", title: "UART Ring Buffer Wrap-Around", track: "EMBEDDED_SYSTEMS" },
@@ -12,24 +17,81 @@ const AVAILABLE_CHALLENGES = [
   { id: "embedded-pwm-prescaler", title: "Timer PWM Prescaler Math", track: "EMBEDDED_SYSTEMS" },
   { id: "embedded-interrupt-race", title: "ISR Volatile Timestamp Race", track: "EMBEDDED_SYSTEMS" },
   { id: "embedded-packed-alignment", title: "ARM Cortex Memory Alignment", track: "EMBEDDED_SYSTEMS" },
-  { id: "rate-limiter-token-bucket", title: "Rate Limiter Token Leaky Bucket", track: "PRODUCTION_SWE" },
-  { id: "jwt-auth-expiration", title: "JWT Auth Expiration & Replay", track: "PRODUCTION_SWE" },
-  { id: "lru-cache-eviction", title: "O(1) LRU Cache Eviction", track: "PRODUCTION_SWE" },
-  { id: "payment-idempotency-race", title: "Payment Idempotency Mutex Race", track: "PRODUCTION_SWE" },
-  { id: "websocket-reconnect-storm", title: "WebSocket Exponential Backoff", track: "PRODUCTION_SWE" },
-  { id: "database-deadlock-retry", title: "PostgreSQL Deadlock Retry", track: "PRODUCTION_SWE" },
+  { id: "swe-token-bucket", title: "Rate Limiter Token Leaky Bucket", track: "PRODUCTION_SWE" },
+  { id: "swe-jwt-alg-confusion", title: "JWT Auth Expiration & Replay", track: "PRODUCTION_SWE" },
+  { id: "swe-cache-stampede", title: "SingleFlight Mutex Lock", track: "PRODUCTION_SWE" },
+  { id: "swe-url-query-sanitizer", title: "URL Query Sanitization & Splitting", track: "PRODUCTION_SWE" },
+  { id: "swe-retry-backoff", title: "Exponential Backoff Jitter Clamping", track: "PRODUCTION_SWE" },
+  { id: "swe-connection-pool-leak", title: "PostgreSQL Deadlock Retry", track: "PRODUCTION_SWE" },
 ];
 
 export default function CampusPage() {
   const { data: session } = useSession();
+  const {
+    role: userRole,
+    setRole: setUserRole,
+    isIndividual,
+    isStudent,
+    isFaculty,
+    isAdmin,
+  } = useUserRole();
 
-  const [cohorts, setCohorts] = useState<Cohort[]>([]);
-  const [selectedCode, setSelectedCode] = useState<string>("ECE-301-EMBEDDED");
+  const [cohorts, setCohorts] = useState<Cohort[]>(() => getDemoCohorts());
+  const [demoCohorts, setDemoCohorts] = useState<Cohort[]>(() => getDemoCohorts());
+  const [selectedCode, setSelectedCode] = useState<string>("ECE-204-EMBEDDED");
   const [activeCohort, setActiveCohort] = useState<
-    (Cohort & { assignments: CohortAssignment[]; students: CohortStudent[]; userSubmissions?: Record<string, boolean> }) | null
-  >(null);
-  const [loading, setLoading] = useState(true);
+    (Cohort & {
+      assignments: CohortAssignment[];
+      students: CohortStudent[];
+      userSubmissions?: Record<string, boolean>;
+      allSubmissions?: CohortSubmission[];
+      stats?: CohortStats;
+    }) | null
+  >(() => {
+    const demo = SEEDED_COHORTS[0];
+    return {
+      ...demo,
+      isDemo: false,
+      userSubmissions: { "asg-ring-buffer": true, "asg-gpio-debounce": true },
+      allSubmissions: demo.students.flatMap((s, sIdx) => [
+        {
+          userId: s.userId,
+          username: s.username,
+          assignmentId: "asg-ring-buffer",
+          status: "PASSED",
+          timeTakenSeconds: 180 + ((sIdx * 17) % 110),
+          passedAt: new Date(Date.now() - 3600000 * 48 + sIdx * 3600000).toISOString(),
+        },
+        ...(s.completedAssignmentsCount >= 2
+          ? [
+              {
+                userId: s.userId,
+                username: s.username,
+                assignmentId: "asg-gpio-debounce",
+                status: "PASSED",
+                timeTakenSeconds: 220 + ((sIdx * 23) % 130),
+                passedAt: new Date(Date.now() - 3600000 * 24 + sIdx * 3600000).toISOString(),
+              },
+            ]
+          : []),
+      ]),
+      stats: {
+        totalStudents: demo.students.length,
+        totalSubmissions: 28,
+        avgTimeSeconds: 245,
+        passRate: 84,
+      },
+    };
+  });
+  const [loading, setLoading] = useState(false);
   const [loadingCohort, setLoadingCohort] = useState(false);
+
+  const userId = session?.user ? (((session.user as any).id || (session.user as any).sub) as string) : "";
+  // Role permissions follow the actively selected role in the switcher (so admin can test as normal student)
+  const isFacultyUser = isFaculty;
+  const isCohortInstructor = Boolean(activeCohort && (isAdmin || (userId && activeCohort.instructorId === userId)));
+  const canManageCohort = isFacultyUser || isCohortInstructor;
+  const isDemoCohort = !session?.user && Boolean(activeCohort?.isDemo);
 
   // Modals state
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -44,9 +106,10 @@ export default function CampusPage() {
   const [createForm, setCreateForm] = useState({
     code: "",
     title: "",
-    department: "Dept. of Electrical & Computer Engineering",
+    department: "Dept. of Computer Science & Engineering",
     institution: "",
     description: "",
+    facultyPasscode: "",
   });
   const [createError, setCreateError] = useState<string | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
@@ -57,24 +120,105 @@ export default function CampusPage() {
     dueDate: "Due Friday, 11:59 PM",
     difficulty: "Medium",
     points: 100,
+    minTestsPassing: 3,
   });
   const [asgLoading, setAsgLoading] = useState(false);
 
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // Load user cohorts list
+  // Automated CSV Gradebook Generator using real enrolled students and real submission data
+  const handleDownloadCSV = () => {
+    if (!activeCohort) return;
+    if (!activeCohort.students || activeCohort.students.length === 0) {
+      alert(
+        `No students are currently enrolled in ${activeCohort.code}. When students join with code "${activeCohort.code}" and complete assignments, their real grades will export here.`
+      );
+      return;
+    }
+
+    const isDemoCohort = !session?.user && Boolean(activeCohort.isDemo);
+    const headers = [
+      "Student Name",
+      "Student ID",
+      "Course Code",
+      "Course Title",
+      "Completed Labs",
+      "Total Labs",
+      "Gradebook Score (%)",
+      "Cohort ELO",
+      "Enrolled Date",
+      "Curriculum Status",
+      "Data Mode",
+    ];
+
+    const totalLabs = activeCohort.assignments.length;
+
+    const rows = activeCohort.students.map((s) => {
+      const completed = Number(s.completedAssignmentsCount || 0);
+      const scorePercent = totalLabs > 0 ? Math.min(100, Math.round((completed / totalLabs) * 100)) : 0;
+      const enrolled = s.enrolledAt ? new Date(s.enrolledAt).toLocaleDateString() : "Active";
+      const status =
+        completed === totalLabs && totalLabs > 0
+          ? "ALL LABS COMPLETED"
+          : `${completed} OF ${totalLabs} COMPLETED`;
+
+      return [
+        `"${(s.username || "Student").replace(/"/g, '""')}"`,
+        `"${s.userId}"`,
+        `"${activeCohort.code}"`,
+        `"${activeCohort.title.replace(/"/g, '""')}"`,
+        completed,
+        totalLabs,
+        `${scorePercent}%`,
+        s.elo,
+        `"${enrolled}"`,
+        `"${status}"`,
+        `"${isDemoCohort ? "SAMPLE DEMO DATA" : "AUTHENTIC"}"`,
+      ].join(",");
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      isDemoCohort
+        ? `${activeCohort.code}_Sample_Demo_Gradebook.csv`
+        : `${activeCohort.code}_Official_Gradebook.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Load user cohorts list and sync user role
   useEffect(() => {
-    fetch("/api/campus/cohorts")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.cohorts) {
-          setCohorts(data.cohorts);
-          if (data.cohorts.length > 0 && !selectedCode) {
-            setSelectedCode(data.cohorts[0].code);
+    Promise.all([
+      fetch("/api/campus/cohorts").then((r) => r.json()),
+      fetch("/api/user/me").then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([cohortData]) => {
+        if (cohortData.demoCohorts) {
+          setDemoCohorts(cohortData.demoCohorts);
+        }
+
+        if (cohortData.cohorts && cohortData.cohorts.length > 0) {
+          setCohorts(cohortData.cohorts);
+          if (!selectedCode) {
+            setSelectedCode(cohortData.cohorts[0].code);
           }
+        } else if (cohortData.demoCohorts && cohortData.demoCohorts.length > 0) {
+          // Unauthenticated visitors or guests see demo cohorts immediately
+          setCohorts(cohortData.demoCohorts);
+          if (!selectedCode) {
+            setSelectedCode(cohortData.demoCohorts[0].code);
+          }
+        } else {
+          setCohorts([]);
         }
       })
-      .catch((err) => console.error("Failed to load cohorts:", err))
+      .catch((err) => console.error("Failed to load campus data:", err))
       .finally(() => setLoading(false));
   }, []);
 
@@ -96,6 +240,14 @@ export default function CampusPage() {
   const handleJoinCohort = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!joinCodeInput.trim()) return;
+
+    if (!session?.user) {
+      if (confirm("Sign in with GitHub is required to enroll in a live class cohort. Would you like to sign in now?")) {
+        signIn("github");
+      }
+      return;
+    }
+
     setJoinLoading(true);
     setJoinError(null);
 
@@ -123,12 +275,51 @@ export default function CampusPage() {
     }
   };
 
+  const handleEnrollCurrentCohort = async (code: string) => {
+    if (!session?.user) {
+      signIn("github");
+      return;
+    }
+    setJoinLoading(true);
+    try {
+      const res = await fetch("/api/campus/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to join cohort");
+      const cRes = await fetch(`/api/campus/cohort/${encodeURIComponent(code)}`);
+      const cData = await cRes.json();
+      if (cData.cohort) {
+        setActiveCohort(cData.cohort);
+      }
+      setCohorts((prev) => {
+        if (prev.some((c) => c.code === code)) return prev;
+        return [data.cohort || { ...activeCohort }, ...prev];
+      });
+      alert(`🎉 Successfully enrolled in ${code}! Your autograded labs and course gradebook are now active.`);
+    } catch (err: any) {
+      alert(err.message || "Could not enroll in class.");
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
   const handleCreateCohort = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!createForm.code || !createForm.title || !createForm.institution) {
       setCreateError("Course code, title, and university are required.");
       return;
     }
+
+    if (!session?.user) {
+      if (confirm("Sign in with GitHub is required to create a permanent college cohort. Would you like to sign in now?")) {
+        signIn("github");
+      }
+      return;
+    }
+
     setCreateLoading(true);
     setCreateError(null);
 
@@ -150,6 +341,7 @@ export default function CampusPage() {
         department: "Dept. of Electrical & Computer Engineering",
         institution: "",
         description: "",
+        facultyPasscode: "",
       });
     } catch (err: any) {
       setCreateError(err.message);
@@ -161,6 +353,40 @@ export default function CampusPage() {
   const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!asgForm.title || !activeCohort) return;
+
+    // If unauthenticated guest, simulate adding it to preview state so user can evaluate UI
+    if (!session?.user) {
+      const newDemoAsg: CohortAssignment = {
+        assignmentId: `asg-demo-${Date.now()}`,
+        title: asgForm.title,
+        challengeId: asgForm.challengeId,
+        dueDate: asgForm.dueDate,
+        track: (AVAILABLE_CHALLENGES.find((c) => c.id === asgForm.challengeId)?.track as any) || "PRODUCTION_SWE",
+        difficulty: asgForm.difficulty as any,
+        points: Number(asgForm.points || 100),
+        createdAt: new Date().toISOString(),
+      };
+      setActiveCohort((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          assignments: [...prev.assignments, newDemoAsg],
+          assignmentsCount: (prev.assignmentsCount || 0) + 1,
+        };
+      });
+      setShowAddAssignmentModal(false);
+      setAsgForm({
+        title: "",
+        challengeId: "embedded-ring-buffer",
+        dueDate: "Due Friday, 11:59 PM",
+        difficulty: "Medium",
+        points: 100,
+        minTestsPassing: 3,
+      });
+      alert("✨ Demo lab assigned! Added to preview syllabus so you can test the interface. Sign in with GitHub to save permanent cohorts.");
+      return;
+    }
+
     setAsgLoading(true);
 
     try {
@@ -177,7 +403,11 @@ export default function CampusPage() {
         }),
       });
       const data = await res.json();
-      if (res.ok && data.assignment) {
+      if (!res.ok) {
+        alert(data.error || "Failed to create assignment.");
+        return;
+      }
+      if (data.assignment) {
         setActiveCohort((prev) => {
           if (!prev) return null;
           return {
@@ -193,6 +423,7 @@ export default function CampusPage() {
           dueDate: "Due Friday, 11:59 PM",
           difficulty: "Medium",
           points: 100,
+          minTestsPassing: 3,
         });
       }
     } catch (err) {
@@ -220,105 +451,348 @@ export default function CampusPage() {
       }}
     >
       {/* ── TOP NAVIGATION ──────────────────────────────────────────────── */}
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 28px",
-          height: 60,
-          borderBottom: "1px solid rgba(255,255,255,0.07)",
-          background: "rgba(8,9,12,0.9)",
-          backdropFilter: "blur(12px)",
-          position: "sticky",
-          top: 0,
-          zIndex: 40,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Link
-            href="/"
-            style={{
-              fontSize: 16,
-              fontWeight: 800,
-              color: "#fff",
-              textDecoration: "none",
-              letterSpacing: -0.5,
-            }}
-          >
-            Code<span style={{ color: "#8b8eff" }}>Duel</span>
-          </Link>
-          <span
-            style={{
-              fontSize: 10,
-              padding: "2px 8px",
-              borderRadius: 4,
-              background: "rgba(139,142,255,0.15)",
-              color: "#8b8eff",
-              fontWeight: 700,
-              letterSpacing: 0.5,
-              border: "1px solid rgba(139,142,255,0.3)",
-            }}
-          >
-            CAMPUS EDITION
-          </span>
-        </div>
+      <AppNavbar activePage="campus" />
 
-        <div style={{ display: "flex", gap: 24, fontSize: 13, alignItems: "center" }}>
-          <Link href="/practice" style={{ color: "#8a8898", textDecoration: "none" }}>
-            Solo Arena
-          </Link>
-          <Link href="/dashboard" style={{ color: "#8a8898", textDecoration: "none" }}>
-            1v1 Duels
-          </Link>
-          <Link href="/leaderboard" style={{ color: "#8a8898", textDecoration: "none" }}>
-            Leaderboard
-          </Link>
-          <Link href="/profile" style={{ color: "#8a8898", textDecoration: "none" }}>
-            Profile
-          </Link>
-          <Link href="/campus" style={{ color: "#fff", fontWeight: 700, textDecoration: "none" }}>
-            Campus
-          </Link>
-        </div>
-
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <button
-            onClick={() => setShowJoinModal(true)}
+      {isIndividual && !isAdmin ? (
+        <div style={{ maxWidth: 880, margin: "40px auto 80px", padding: "0 24px" }}>
+          {/* Institutional Gateway for Individual Developers */}
+          <div
             style={{
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              color: "#fff",
-              fontSize: 12,
-              fontWeight: 600,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontFamily: "inherit",
+              background: "linear-gradient(135deg, rgba(139,142,255,0.08) 0%, rgba(56,189,248,0.04) 100%)",
+              border: "1px solid rgba(139,142,255,0.25)",
+              borderRadius: 18,
+              padding: "44px 36px",
+              textAlign: "center",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.7), 0 0 40px rgba(139,142,255,0.05)",
             }}
           >
-            🔑 Join Class with Code
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            style={{
-              background: "#8b8eff",
-              border: "none",
-              color: "#08090c",
-              fontSize: 12,
-              fontWeight: 700,
-              padding: "6px 14px",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            + Create Course Cohort
-          </button>
-        </div>
-      </nav>
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                background: "rgba(139,142,255,0.12)",
+                border: "1px solid rgba(139,142,255,0.3)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 30,
+                margin: "0 auto 18px",
+              }}
+            >
+              🏛️
+            </div>
 
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "3px 10px",
+                borderRadius: 100,
+                background: "rgba(139,142,255,0.15)",
+                color: "#8b8eff",
+                border: "1px solid rgba(139,142,255,0.3)",
+                textTransform: "uppercase",
+                letterSpacing: 1,
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              Academic &amp; University Portal
+            </span>
+
+            <h1 style={{ fontSize: 28, fontWeight: 800, margin: "14px 0 8px", color: "#fff", letterSpacing: "-0.02em" }}>
+              Codeduel Campus Edition
+            </h1>
+            <p style={{ fontSize: 14, color: "#9ca3af", maxWidth: 620, margin: "0 auto 32px", lineHeight: 1.6 }}>
+              You are currently viewing Codeduel with an <strong>Individual Developer</strong> profile. Campus Edition is an institutional environment dedicated to university course cohorts, student lab autograding, and verified faculty grading.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, textAlign: "left", marginBottom: 32 }}>
+              {/* Option 1: College Student */}
+              <div
+                style={{
+                  background: "rgba(74,222,128,0.04)",
+                  border: "1px solid rgba(74,222,128,0.2)",
+                  borderRadius: 14,
+                  padding: "24px 22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 24 }}>🎓</span>
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#fff" }}>
+                        I am a College Student
+                      </h3>
+                      <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 600 }}>Enrolled Student Portal</span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "#9ca3af", lineHeight: 1.5, margin: "0 0 16px" }}>
+                    Join your professor's class cohort using an invite code. Complete assigned SWE &amp; Embedded debugging labs with real-time autograder scoring.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setUserRole("STUDENT");
+                  }}
+                  style={{
+                    background: "#4ade80",
+                    color: "#000",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "11px 18px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    width: "100%",
+                  }}
+                >
+                  <span>🎓</span>
+                  <span>Enter as College Student →</span>
+                </button>
+              </div>
+
+              {/* Option 2: Faculty Member */}
+              <div
+                style={{
+                  background: "rgba(56,189,248,0.04)",
+                  border: "1px solid rgba(56,189,248,0.2)",
+                  borderRadius: 14,
+                  padding: "24px 22px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 24 }}>🏛️</span>
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#fff" }}>
+                        I am Faculty / Instructor
+                      </h3>
+                      <span style={{ fontSize: 11, color: "#38bdf8", fontWeight: 600 }}>Educator Command Center</span>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "#9ca3af", lineHeight: 1.5, margin: "0 0 16px" }}>
+                    Create departmental cohorts, author incident triage assignments, monitor live student submission telemetry, and export official CSV gradebooks.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setUserRole("FACULTY");
+                  }}
+                  style={{
+                    background: "#38bdf8",
+                    color: "#08090c",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "11px 18px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    width: "100%",
+                  }}
+                >
+                  <span>🏛️</span>
+                  <span>Enter as Faculty / Instructor →</span>
+                </button>
+              </div>
+            </div>
+
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 20 }}>
+              <Link
+                href="/dashboard"
+                style={{
+                  fontSize: 13,
+                  color: "#8a8898",
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  transition: "color 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#8a8898")}
+              >
+                <span>←</span>
+                <span>Return to Individual Competitive 1v1 Arena</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px 64px" }}>
+        {/* ── DEMO PROTOTYPE PREVIEW BANNER — only for unauthenticated guests ── */}
+        {!session?.user && (
+          <div
+            style={{
+              background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(234, 88, 12, 0.05) 100%)",
+              border: "1px solid rgba(245, 158, 11, 0.3)",
+              borderRadius: 12,
+              padding: "16px 20px",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 14,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 10,
+                  background: "rgba(245, 158, 11, 0.15)",
+                  border: "1px solid rgba(245, 158, 11, 0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 22,
+                  flexShrink: 0,
+                }}
+              >
+                🧪
+              </div>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: "#fbbf24", letterSpacing: "0.04em" }}>
+                    CAMPUS EDITION PREVIEW
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: "rgba(245, 158, 11, 0.2)",
+                      color: "#fde68a",
+                      border: "1px solid rgba(245, 158, 11, 0.4)",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Interactive Sandbox
+                  </span>
+                  <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                    (Sign in with GitHub to enroll in live courses)
+                  </span>
+                </div>
+                <p style={{ margin: "4px 0 0", fontSize: 12, color: "#d1d5db", lineHeight: 1.5, maxWidth: 760 }}>
+                  You are previewing simulated course cohorts, sample student rosters, and autograded incident triage telemetry. Colleges and students can freely inspect the UI, switch between <strong>Student Mode</strong> and <strong>Faculty Mode</strong>, test lab launches, and export gradebooks before signing up.
+                </p>
+              </div>
+            </div>
+
+            {!session?.user ? (
+              <button
+                onClick={() => signIn("github")}
+                style={{
+                  background: "linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)",
+                  color: "#08090c",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "9px 18px",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  boxShadow: "0 4px 14px rgba(245, 158, 11, 0.3)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span>⚡ Sign Up / Sign In with GitHub</span>
+                <span>→</span>
+              </button>
+            ) : (
+              <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                Signed in as <strong style={{ color: "#fff" }}>{session.user.name}</strong>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── AUTHENTIC ROLE CONTEXT BANNER ──────────────── */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 20,
+            background: "#0c0d14",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 10,
+            padding: "10px 18px",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "3px 10px",
+                borderRadius: 6,
+                background: isAdmin ? "rgba(244,63,94,0.12)" : canManageCohort ? "rgba(56,189,248,0.12)" : "rgba(74,222,128,0.12)",
+                color: isAdmin ? "#f43f5e" : canManageCohort ? "#38bdf8" : "#4ade80",
+                border: `1px solid ${isAdmin ? "rgba(244,63,94,0.3)" : canManageCohort ? "rgba(56,189,248,0.25)" : "rgba(74,222,128,0.25)"}`,
+              }}
+            >
+              {isAdmin ? "⚡ ROOT CAMPUS SUPERVISOR" : canManageCohort ? "🏛️ FACULTY INSTRUCTOR HUB" : "🎓 STUDENT COURSE PORTAL"}
+            </span>
+            <span style={{ fontSize: 12, color: "#8a8898" }}>
+              {isAdmin
+                ? "Root Supervision: Universal Access to Supervise All Cohorts, Author Assignments & Inspect Telemetry"
+                : canManageCohort
+                ? "Verified Course Management, Live Autograder Telemetry & Gradebook Export"
+                : activeCohort
+                ? `Enrolled in ${activeCohort.title} (${activeCohort.code})`
+                : "Syllabus Labs, Practice Challenges & Calibrated Peer Matchmaking"}
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {canManageCohort && activeCohort && (
+              <button
+                onClick={handleDownloadCSV}
+                style={{
+                  background: "rgba(74,222,128,0.12)",
+                  border: "1px solid rgba(74,222,128,0.3)",
+                  color: "#4ade80",
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontFamily: "inherit",
+                }}
+              >
+                <span>📥</span>
+                <span>Download Official CSV Gradebook</span>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* ── B2B HERO BANNER ────────────────────────────────────────────── */}
         <div
           style={{
@@ -368,51 +842,254 @@ export default function CampusPage() {
           </div>
         </div>
 
-        {/* ── COHORT TABS SELECTOR ───────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 20 }}>
-          {cohorts.map((c) => {
-            const isSelected = c.code === selectedCode;
-            return (
-              <button
-                key={c.code}
-                onClick={() => setSelectedCode(c.code)}
+        {/* ── COHORT TABS SELECTOR ── */}
+        {cohorts.length > 0 && (
+          <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 20 }}>
+            {cohorts.map((c) => {
+              const isSelected = c.code === selectedCode;
+              return (
+                <button
+                  key={c.code}
+                  onClick={() => setSelectedCode(c.code)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "10px 16px",
+                    borderRadius: 8,
+                    background: isSelected ? "rgba(139,142,255,0.15)" : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${isSelected ? "rgba(139,142,255,0.4)" : "rgba(255,255,255,0.06)"}`,
+                    color: isSelected ? "#fff" : "#8a8898",
+                    fontSize: 12,
+                    fontWeight: isSelected ? 700 : 500,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  <span>{c.code}</span>
+                  {!session?.user && c.isDemo && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        padding: "1px 5px",
+                        borderRadius: 3,
+                        background: "rgba(74,222,128,0.15)",
+                        color: "#4ade80",
+                      }}
+                    >
+                      Sample Demo
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── MAIN COHORT VIEW OR ONBOARDING ── */}
+        {!selectedCode && cohorts.length === 0 ? (
+          !canManageCohort ? (
+            <div
+              style={{
+                background: "#0c0d14",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 16,
+                padding: "44px 32px",
+                textAlign: "center",
+                maxWidth: 640,
+                margin: "20px auto 40px",
+                boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div
                 style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "rgba(74,222,128,0.12)",
+                  border: "1px solid rgba(74,222,128,0.3)",
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  background: isSelected ? "rgba(139,142,255,0.15)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${isSelected ? "rgba(139,142,255,0.4)" : "rgba(255,255,255,0.06)"}`,
-                  color: isSelected ? "#fff" : "#8a8898",
-                  fontSize: 12,
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  fontFamily: "inherit",
+                  justifyContent: "center",
+                  fontSize: 26,
+                  margin: "0 auto 16px",
                 }}
               >
-                <span>{c.code}</span>
-                {c.isDemo && (
-                  <span
-                    style={{
-                      fontSize: 9,
-                      padding: "1px 5px",
-                      borderRadius: 3,
-                      background: "rgba(74,222,128,0.15)",
-                      color: "#4ade80",
-                    }}
-                  >
-                    Sample Demo
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                🎓
+              </div>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>
+                Welcome to Student Campus Edition
+              </h2>
+              <p style={{ fontSize: 13, color: "#8a8898", lineHeight: 1.6, maxWidth: 480, margin: "0 auto 28px" }}>
+                You are not enrolled in any university class cohorts yet. Enter the cohort code provided by your professor or TA to sync your course syllabus, assignments, and automated grading.
+              </p>
 
-        {/* ── ACTIVE COHORT DETAIL VIEW ──────────────────────────────────── */}
-        {loadingCohort || !activeCohort ? (
+              <form onSubmit={handleJoinCohort} style={{ display: "flex", gap: 10, maxWidth: 440, margin: "0 auto 20px" }}>
+                <input
+                  type="text"
+                  placeholder="Enter Course Code (e.g. CS-301)"
+                  value={joinCodeInput}
+                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                  style={{
+                    flex: 1,
+                    background: "rgba(0,0,0,0.5)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    borderRadius: 8,
+                    padding: "12px 16px",
+                    color: "#fff",
+                    fontSize: 14,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    textTransform: "uppercase",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={joinLoading || !joinCodeInput.trim()}
+                  style={{
+                    background: "#4ade80",
+                    color: "#000",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "12px 20px",
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {joinLoading ? "Joining..." : "Join Class"}
+                </button>
+              </form>
+
+              {joinError && (
+                <div style={{ color: "#f87171", fontSize: 12, marginBottom: 20 }}>
+                  ⚠️ {joinError}
+                </div>
+              )}
+
+              {demoCohorts.length > 0 && (
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24, marginTop: 10 }}>
+                  <div style={{ fontSize: 11, color: "#6e6d7a", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 14 }}>
+                    Or Join An Available University Course Cohort
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+                    {demoCohorts.map((demo) => (
+                      <button
+                        key={demo.code}
+                        onClick={() => {
+                          setSelectedCode(demo.code);
+                        }}
+                        style={{
+                          background: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: 8,
+                          padding: "10px 18px",
+                          color: "#e8e6f0",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <span style={{ fontWeight: 700, color: "#fff" }}>📚 {demo.code}</span>
+                        <span style={{ color: "#a09eb0" }}>{demo.title}</span>
+                        <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 700 }}>
+                          ({demo.assignmentsCount} labs)
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div
+              style={{
+                background: "#0c0d14",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 16,
+                padding: "44px 32px",
+                textAlign: "center",
+                maxWidth: 640,
+                margin: "20px auto 40px",
+                boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "rgba(56,189,248,0.12)",
+                  border: "1px solid rgba(56,189,248,0.3)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 26,
+                  margin: "0 auto 16px",
+                }}
+              >
+                🏛️
+              </div>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 8px" }}>
+                Faculty Course Command Center
+              </h2>
+              <p style={{ fontSize: 13, color: "#8a8898", lineHeight: 1.6, maxWidth: 480, margin: "0 auto 28px" }}>
+                Create your first course cohort to generate student join codes, assign real-world bug tickets, track live submission diffs, and export automated CSV gradebooks.
+              </p>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                style={{
+                  background: "#38bdf8",
+                  color: "#000",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "12px 24px",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  marginBottom: 24,
+                }}
+              >
+                + Create Course Cohort
+              </button>
+
+              {demoCohorts.length > 0 && (
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 24, marginTop: 10 }}>
+                  <div style={{ fontSize: 11, color: "#6e6d7a", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 14 }}>
+                    Or Inspect Example Instructor Lab
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
+                    {demoCohorts.map((demo) => (
+                      <button
+                        key={demo.code}
+                        onClick={() => setSelectedCode(demo.code)}
+                        style={{
+                          background: "rgba(255,255,255,0.03)",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: 8,
+                          padding: "9px 16px",
+                          color: "#e8e6f0",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <span>⚡ Inspect {demo.code} Sandbox</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        ) : loadingCohort || !activeCohort ? (
           <div style={{ padding: "64px 0", textAlign: "center", color: "#8b8eff" }}>
             Loading course dashboard...
           </div>
@@ -444,6 +1121,22 @@ export default function CampusPage() {
                     >
                       {activeCohort.code}
                     </span>
+                    {isDemoCohort && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          background: "rgba(245, 158, 11, 0.15)",
+                          color: "#fbbf24",
+                          border: "1px solid rgba(245, 158, 11, 0.35)",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Sample Course Preview
+                      </span>
+                    )}
                     <span style={{ fontSize: 12, color: "#6e6d7a" }}>
                       {activeCohort.department} · {activeCohort.institution}
                     </span>
@@ -475,22 +1168,43 @@ export default function CampusPage() {
                   <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", letterSpacing: 1, marginBottom: 8 }}>
                     {activeCohort.code}
                   </div>
-                  <button
-                    onClick={copyJoinCode}
-                    style={{
-                      background: "rgba(139,142,255,0.15)",
-                      border: "1px solid rgba(139,142,255,0.3)",
-                      color: "#8b8eff",
-                      padding: "5px 12px",
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    {copiedCode ? "✓ Copied to Clipboard" : "Copy Join Code"}
-                  </button>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                    <button
+                      onClick={copyJoinCode}
+                      style={{
+                        background: "rgba(139,142,255,0.15)",
+                        border: "1px solid rgba(139,142,255,0.3)",
+                        color: "#8b8eff",
+                        padding: "5px 12px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      {copiedCode ? "✓ Copied to Clipboard" : "Copy Join Code"}
+                    </button>
+                    {isStudent && !activeCohort.students.some((s) => s.userId === userId) && (
+                      <button
+                        onClick={() => handleEnrollCurrentCohort(activeCohort.code)}
+                        disabled={joinLoading}
+                        style={{
+                          background: "#4ade80",
+                          border: "none",
+                          color: "#000",
+                          padding: "5px 12px",
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        {joinLoading ? "Enrolling..." : "Enroll in Course"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -506,9 +1220,11 @@ export default function CampusPage() {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 10, color: "#6e6d7a", textTransform: "uppercase" }}>Enrolled Students</div>
+                  <div style={{ fontSize: 10, color: "#6e6d7a", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>Enrolled Students</span>
+                  </div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginTop: 2 }}>
-                    {activeCohort.students.length || activeCohort.studentCount} Engineers
+                    {activeCohort.students.length} {activeCohort.students.length === 1 ? "Student" : "Students"}
                   </div>
                 </div>
                 <div>
@@ -518,19 +1234,24 @@ export default function CampusPage() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "#6e6d7a", textTransform: "uppercase" }}>Cohort Median ELO</div>
+                  <div style={{ fontSize: 10, color: "#6e6d7a", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>Cohort Median ELO</span>
+                  </div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#4ade80", marginTop: 2 }}>
-                    {Math.round(
-                      activeCohort.students.reduce((acc, s) => acc + s.elo, 0) /
-                        (activeCohort.students.length || 1)
-                    )}{" "}
+                    {activeCohort.students.length > 0
+                      ? Math.round(activeCohort.students.reduce((acc, s) => acc + s.elo, 0) / activeCohort.students.length)
+                      : 1000}{" "}
                     Rating
                   </div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: "#6e6d7a", textTransform: "uppercase" }}>Incident Pass Rate</div>
+                  <div style={{ fontSize: 10, color: "#6e6d7a", textTransform: "uppercase", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>Incident Pass Rate</span>
+                  </div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#fbbf24", marginTop: 2 }}>
-                    84.2% Passed
+                    {activeCohort.stats && activeCohort.stats.totalSubmissions > 0
+                      ? `${activeCohort.stats.passRate}% Automated Pass`
+                      : "Awaiting Submissions"}
                   </div>
                 </div>
               </div>
@@ -542,24 +1263,30 @@ export default function CampusPage() {
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                    Assigned Incident Triage Labs ({activeCohort.assignments.length})
+                    {canManageCohort ? `Assigned Incident Triage Labs (${activeCohort.assignments.length})` : "Course Syllabus & Labs"}
                   </h3>
-                  <button
-                    onClick={() => setShowAddAssignmentModal(true)}
-                    style={{
-                      background: "rgba(139,142,255,0.12)",
-                      border: "1px solid rgba(139,142,255,0.3)",
-                      color: "#8b8eff",
-                      padding: "4px 10px",
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    + Assign New Lab
-                  </button>
+                  {canManageCohort ? (
+                    <button
+                      onClick={() => setShowAddAssignmentModal(true)}
+                      style={{
+                        background: "rgba(139,142,255,0.12)",
+                        border: "1px solid rgba(139,142,255,0.3)",
+                        color: "#8b8eff",
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      + Assign New Lab
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 700 }}>
+                      ✓ {Object.keys(activeCohort.userSubmissions || {}).length}/{activeCohort.assignments.length} Labs Completed
+                    </span>
+                  )}
                 </div>
 
                 {activeCohort.assignments.length === 0 ? (
@@ -669,11 +1396,13 @@ export default function CampusPage() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                    <h3 style={{ fontSize: 13, fontWeight: 700, color: "#fff", margin: 0, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                      Class Roster &amp; Ranking
-                    </h3>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <h3 style={{ fontSize: 13, fontWeight: 700, color: "#fff", margin: 0, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Class Roster &amp; Ranking
+                      </h3>
+                    </div>
                     <span style={{ fontSize: 11, color: "#6e6d7a" }}>
-                      {activeCohort.students.length} Ranked
+                      {activeCohort.students.length} Enrolled
                     </span>
                   </div>
 
@@ -717,109 +1446,249 @@ export default function CampusPage() {
                         </button>
                       </div>
                     ) : (
-                      activeCohort.students.map((student, idx) => (
-                        <div
-                          key={student.userId}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "10px 12px",
-                            borderRadius: 8,
-                            background: idx === 0 ? "rgba(139,142,255,0.08)" : "rgba(255,255,255,0.02)",
-                            border: idx === 0 ? "1px solid rgba(139,142,255,0.25)" : "1px solid transparent",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <span
-                              style={{
-                                fontSize: 11,
-                                fontWeight: 800,
-                                color: idx === 0 ? "#fbbf24" : idx === 1 ? "#cbd5e1" : idx === 2 ? "#d97706" : "#6e6d7a",
-                                width: 18,
-                              }}
-                            >
-                              #{idx + 1}
-                            </span>
-                            <div
-                              style={{
-                                width: 28,
-                                height: 28,
-                                borderRadius: "50%",
-                                background: "#161722",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: 11,
-                                fontWeight: 700,
-                                overflow: "hidden",
-                              }}
-                            >
-                              {student.avatar ? (
-                                <img src={student.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                              ) : (
-                                student.username[0]?.toUpperCase()
-                              )}
-                            </div>
-                            <div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: "#fff" }}>
-                                {student.username}
+                      activeCohort.students.map((student, idx) => {
+                        const isCurrentUser = userId && student.userId === userId;
+                        return (
+                          <div
+                            key={student.userId}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "10px 12px",
+                              borderRadius: 8,
+                              background: isCurrentUser
+                                ? "rgba(74,222,128,0.08)"
+                                : idx === 0
+                                ? "rgba(139,142,255,0.08)"
+                                : "rgba(255,255,255,0.02)",
+                              border: isCurrentUser
+                                ? "1px solid rgba(74,222,128,0.3)"
+                                : idx === 0
+                                ? "1px solid rgba(139,142,255,0.25)"
+                                : "1px solid transparent",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  color: idx === 0 ? "#fbbf24" : idx === 1 ? "#cbd5e1" : idx === 2 ? "#d97706" : "#6e6d7a",
+                                  width: 18,
+                                }}
+                              >
+                                #{idx + 1}
+                              </span>
+                              <div
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: "50%",
+                                  background: "#161722",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {student.avatar ? (
+                                  <img src={student.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                ) : (
+                                  student.username[0]?.toUpperCase()
+                                )}
                               </div>
-                              <div style={{ fontSize: 10, color: "#6e6d7a" }}>
-                                {student.completedAssignmentsCount} Labs Completed
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span>{student.username}</span>
+                                  {isCurrentUser && (
+                                    <span style={{ fontSize: 9, background: "#4ade80", color: "#000", padding: "1px 5px", borderRadius: 3, fontWeight: 700 }}>
+                                      YOU
+                                    </span>
+                                  )}
+                                  {student.role === "FACULTY" && (
+                                    <span style={{ fontSize: 9, background: "rgba(56,189,248,0.2)", color: "#38bdf8", padding: "1px 5px", borderRadius: 3, fontWeight: 700 }}>
+                                      INSTRUCTOR
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ fontSize: 10, color: "#6e6d7a" }}>
+                                  {student.completedAssignmentsCount} Labs Completed
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#8b8eff" }}>
-                              {student.elo}
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#8b8eff" }}>
+                                {student.elo}
+                              </div>
+                              <div style={{ fontSize: 9, color: "#6e6d7a" }}>ELO</div>
                             </div>
-                            <div style={{ fontSize: 9, color: "#6e6d7a" }}>ELO</div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
 
-                {/* FACULTY TRIAGE TELEMETRY (B2B DEMO CARD) */}
-                <div
-                  style={{
-                    background: "linear-gradient(135deg, rgba(74,222,128,0.04) 0%, rgba(139,142,255,0.03) 100%)",
-                    border: "1px solid rgba(74,222,128,0.2)",
-                    borderRadius: 14,
-                    padding: 20,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-                    <span style={{ fontSize: 14 }}>📊</span>
-                    <h4 style={{ fontSize: 12, fontWeight: 700, margin: 0, color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                      Faculty Diagnostic Telemetry
-                    </h4>
+                {/* FACULTY VIEW: DIAGNOSTIC TELEMETRY & GRADEBOOK */}
+                {canManageCohort ? (
+                  <div
+                    style={{
+                      background: "linear-gradient(135deg, rgba(74,222,128,0.04) 0%, rgba(139,142,255,0.03) 100%)",
+                      border: "1px solid rgba(74,222,128,0.2)",
+                      borderRadius: 14,
+                      padding: 20,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 14 }}>📊</span>
+                        <h4 style={{ fontSize: 12, fontWeight: 700, margin: 0, color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                          Faculty Diagnostic Telemetry
+                        </h4>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          background: isDemoCohort ? "rgba(245, 158, 11, 0.15)" : "rgba(74,222,128,0.15)",
+                          color: isDemoCohort ? "#fbbf24" : "#4ade80",
+                          padding: "2px 7px",
+                          borderRadius: 4,
+                          fontWeight: 700,
+                          border: `1px solid ${isDemoCohort ? "rgba(245, 158, 11, 0.3)" : "rgba(74,222,128,0.3)"}`,
+                        }}
+                      >
+                        {isDemoCohort ? "PREVIEW ENVIRONMENT" : "AUTHENTIC"}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 11, color: "#8a8898", margin: "0 0 14px", lineHeight: 1.5 }}>
+                      Live telemetry computed across student test suite runs and compiler outputs for this section.
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 11 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: 6 }}>
+                        <span style={{ color: "#6e6d7a" }}>Cohort Enrollment:</span>
+                        <strong style={{ color: "#4ade80" }}>
+                          {activeCohort.students.length} Enrolled {activeCohort.students.length === 1 ? "Student" : "Students"}
+                        </strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: 6 }}>
+                        <span style={{ color: "#6e6d7a" }}>Total Submissions:</span>
+                        <strong style={{ color: "#fff" }}>
+                          {activeCohort.stats?.totalSubmissions ?? 0} Recorded
+                        </strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: 6 }}>
+                        <span style={{ color: "#6e6d7a" }}>Average Time-to-Fix:</span>
+                        <strong style={{ color: "#fff" }}>
+                          {activeCohort.stats && activeCohort.stats.totalSubmissions > 0
+                            ? `${Math.floor(activeCohort.stats.avgTimeSeconds / 60)}m ${activeCohort.stats.avgTimeSeconds % 60}s`
+                            : "Awaiting Submissions"}
+                        </strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: 6 }}>
+                        <span style={{ color: "#6e6d7a" }}>Cohort Pass Rate:</span>
+                        <strong style={{ color: "#fbbf24" }}>
+                          {activeCohort.stats && activeCohort.stats.totalSubmissions > 0
+                            ? `${activeCohort.stats.passRate}% Automated Pass`
+                            : "Awaiting Submissions"}
+                        </strong>
+                      </div>
+
+                      {/* Lab Completion Breakdown */}
+                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div style={{ fontSize: 10, color: "#8b8eff", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
+                          Lab Completion Status:
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 5, fontFamily: "'JetBrains Mono', monospace", fontSize: 10 }}>
+                          {activeCohort.assignments.length === 0 ? (
+                            <span style={{ color: "#6e6d7a" }}>No labs assigned yet.</span>
+                          ) : (
+                            activeCohort.assignments.map((asg) => {
+                              const passedCount = (activeCohort.allSubmissions || []).filter(
+                                (s) => s.assignmentId === asg.assignmentId
+                              ).length;
+                              return (
+                                <div key={asg.assignmentId} style={{ display: "flex", justifyContent: "space-between", color: "#c8c6d4" }}>
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 190 }}>
+                                    {asg.title}
+                                  </span>
+                                  <span style={{ color: passedCount > 0 ? "#4ade80" : "#6e6d7a", fontWeight: 700 }}>
+                                    {passedCount}/{activeCohort.students.length} Passed
+                                  </span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleDownloadCSV}
+                        style={{
+                          marginTop: 10,
+                          width: "100%",
+                          background: "rgba(74,222,128,0.12)",
+                          border: "1px solid rgba(74,222,128,0.3)",
+                          color: "#4ade80",
+                          padding: "8px 12px",
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        <span>📥</span>
+                        <span>Download Official CSV Gradebook</span>
+                      </button>
+                    </div>
                   </div>
-                  <p style={{ fontSize: 11, color: "#8a8898", margin: "0 0 14px", lineHeight: 1.5 }}>
-                    Automated telemetry compiled across Docker / VM test runs for this cohort.
-                  </p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 11 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: 6 }}>
-                      <span style={{ color: "#6e6d7a" }}>Cohort Status:</span>
-                      <strong style={{ color: activeCohort.students.length > 0 ? "#4ade80" : "#fbbf24" }}>
-                        {activeCohort.students.length > 0 ? `${activeCohort.students.length} Enrolled` : "Awaiting Student Enrollment"}
-                      </strong>
+                ) : (
+                  /* STUDENT VIEW: LAB GUIDELINES & SYLLABUS SYNC */
+                  <div
+                    style={{
+                      background: "linear-gradient(135deg, rgba(139,142,255,0.04) 0%, rgba(56,189,248,0.03) 100%)",
+                      border: "1px solid rgba(139,142,255,0.2)",
+                      borderRadius: 14,
+                      padding: 20,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                      <span style={{ fontSize: 14 }}>⚡</span>
+                      <h4 style={{ fontSize: 12, fontWeight: 700, margin: 0, color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        Autograded Lab Sandbox
+                      </h4>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.04)", paddingBottom: 6 }}>
-                      <span style={{ color: "#6e6d7a" }}>Median Patch Latency:</span>
-                      <strong style={{ color: activeCohort.students.length > 0 ? "#4ade80" : "#8a8898" }}>
-                        {activeCohort.students.length > 0 ? "4 min 18 sec" : "No lab submissions yet"}
-                      </strong>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span style={{ color: "#6e6d7a" }}>Active Lab Curriculum:</span>
-                      <strong style={{ color: "#38bdf8" }}>{activeCohort.assignments.length} Hands-on Labs</strong>
+                    <p style={{ fontSize: 11, color: "#8a8898", margin: "0 0 14px", lineHeight: 1.5 }}>
+                      All lab challenges are compiled in isolated sandbox environments with instant autograding against test assertions.
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 11 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#cbd5e1" }}>
+                        <span style={{ color: "#4ade80" }}>✓</span>
+                        <span>Zero-latency compiler diagnostics and memory check</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#cbd5e1" }}>
+                        <span style={{ color: "#4ade80" }}>✓</span>
+                        <span>Real-time gradebook synchronization on all tests passed</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#cbd5e1" }}>
+                        <span style={{ color: "#4ade80" }}>✓</span>
+                        <span>ELO rating progression on each successfully debugged incident</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#cbd5e1" }}>
+                        <span style={{ color: "#4ade80" }}>✓</span>
+                        <span>1v1 peer challenges to practice calibrated triage under time pressure</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -828,7 +1697,7 @@ export default function CampusPage() {
         {/* CAMPUS FOOTER */}
         <div style={{ marginTop: 48, paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, fontSize: 12, color: "#6e6d7a" }}>
           <div>
-            CodeDuel Campus Edition · Punjab Engineering College (PEC), Chandigarh
+            Codeduel Campus Edition · Collegiate Engineering &amp; Placement Labs Hub
           </div>
           <div style={{ display: "flex", gap: 20 }}>
             <Link href="/about" style={{ color: "#8a8898", textDecoration: "none" }}>About</Link>
@@ -838,6 +1707,7 @@ export default function CampusPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── JOIN CLASS MODAL ────────────────────────────────────────────── */}
       {showJoinModal && (
@@ -1063,6 +1933,32 @@ export default function CampusPage() {
                     boxSizing: "border-box",
                   }}
                 />
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 11, color: "#6e6d7a", marginBottom: 6 }}>
+                  FACULTY VERIFICATION KEY (REQUIRED FOR INSTRUCTOR ACCESS)
+                </label>
+                <input
+                  type="password"
+                  placeholder="Enter institutional faculty key"
+                  value={createForm.facultyPasscode}
+                  onChange={(e) => setCreateForm({ ...createForm, facultyPasscode: e.target.value })}
+                  style={{
+                    width: "100%",
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 6,
+                    padding: "8px 12px",
+                    color: "#fff",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 12,
+                    boxSizing: "border-box",
+                  }}
+                />
+                <div style={{ fontSize: 10, color: "#6e6d7a", marginTop: 4 }}>
+                  Institutional verification key provided to authorized course instructors (or verified .edu/.ac.in university domain).
+                </div>
               </div>
 
               {createError && (

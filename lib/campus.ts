@@ -1,148 +1,13 @@
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { GetCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { STARTING_ELO } from "./elo";
 
-export interface CohortAssignment {
-  assignmentId: string;
-  title: string;
-  challengeId: string;
-  dueDate: string;
-  track: "EMBEDDED_SYSTEMS" | "PRODUCTION_SWE";
-  difficulty: "Easy" | "Medium" | "Hard";
-  points: number;
-  createdAt: string;
-}
-
-export interface CohortStudent {
-  userId: string;
-  username: string;
-  avatar: string | null;
-  elo: number;
-  enrolledAt: string;
-  role: "STUDENT" | "TA" | "FACULTY";
-  completedAssignmentsCount: number;
-}
-
-export interface Cohort {
-  code: string;
-  title: string;
-  department: string;
-  institution: string;
-  instructorId: string;
-  instructorName: string;
-  description: string;
-  createdAt: string;
-  studentCount: number;
-  assignmentsCount: number;
-  isDemo?: boolean;
-}
-
-// ── Default Seeded Academic Cohorts for Demos ──────────────────────────────────
-export const SEEDED_COHORTS: Array<Cohort & { assignments: CohortAssignment[]; students: CohortStudent[] }> = [
-  {
-    code: "ECE-301-EMBEDDED",
-    title: "ECE-301: Microcontrollers & Real-Time Embedded Systems",
-    department: "Dept. of Electronics & Communication Engineering",
-    institution: "Punjab Engineering College (PEC), Chandigarh",
-    instructorId: "faculty_vikram_malhotra",
-    instructorName: "Prof. Vikram Malhotra (Embedded Systems & IoT Lab)",
-    description: "Hands-on low-level firmware debugging: race conditions, ISRs, UART ring buffers, and ARM Cortex memory alignment.",
-    createdAt: "2026-09-01T08:00:00.000Z",
-    studentCount: 0,
-    assignmentsCount: 4,
-    assignments: [
-      {
-        assignmentId: "asg-ring-buffer",
-        title: "Lab 1: UART Ring Buffer Wrap-Around Triage",
-        challengeId: "embedded-ring-buffer",
-        dueDate: "Due Friday, 11:59 PM",
-        track: "EMBEDDED_SYSTEMS",
-        difficulty: "Medium",
-        points: 100,
-        createdAt: "2026-09-05T10:00:00.000Z",
-      },
-      {
-        assignmentId: "asg-gpio-debounce",
-        title: "Lab 2: Switch Contact Debounce State Machine",
-        challengeId: "embedded-gpio-debounce",
-        dueDate: "Due Next Wednesday",
-        track: "EMBEDDED_SYSTEMS",
-        difficulty: "Easy",
-        points: 75,
-        createdAt: "2026-09-12T10:00:00.000Z",
-      },
-      {
-        assignmentId: "asg-spi-endian",
-        title: "Lab 3: SPI 16-Bit Byte Swapping & Endianness",
-        challengeId: "embedded-spi-endianness",
-        dueDate: "Due in 2 Weeks",
-        track: "EMBEDDED_SYSTEMS",
-        difficulty: "Medium",
-        points: 100,
-        createdAt: "2026-09-19T10:00:00.000Z",
-      },
-      {
-        assignmentId: "asg-interrupt-race",
-        title: "Lab 4: ISR Volatile Timestamp Race Condition",
-        challengeId: "embedded-interrupt-race",
-        dueDate: "Final Lab (Exam Prep)",
-        track: "EMBEDDED_SYSTEMS",
-        difficulty: "Hard",
-        points: 150,
-        createdAt: "2026-09-26T10:00:00.000Z",
-      },
-    ],
-    students: [],
-  },
-  {
-    code: "CS-210-SYSTEMS",
-    title: "CS-210: Systems Programming & Cloud Infrastructure",
-    department: "Dept. of Computer Science & Engineering",
-    institution: "Punjab Engineering College (PEC), Chandigarh",
-    instructorId: "faculty_divya_gupta",
-    instructorName: "Prof. Divya Gupta (Systems & Networks Lab)",
-    description: "Production SWE incident response: rate limiting algorithms, token buckets, memory management, and caching concurrency.",
-    createdAt: "2026-09-01T08:00:00.000Z",
-    studentCount: 0,
-    assignmentsCount: 3,
-    assignments: [
-      {
-        assignmentId: "asg-token-bucket",
-        title: "Lab 1: Rate Limiter Token Leaky Bucket Fix",
-        challengeId: "rate-limiter-token-bucket",
-        dueDate: "Due Tomorrow",
-        track: "PRODUCTION_SWE",
-        difficulty: "Medium",
-        points: 100,
-        createdAt: "2026-09-05T10:00:00.000Z",
-      },
-      {
-        assignmentId: "asg-jwt-auth",
-        title: "Lab 2: JWT Expiration & Replay Attack Defense",
-        challengeId: "jwt-auth-expiration",
-        dueDate: "Due Next Week",
-        track: "PRODUCTION_SWE",
-        difficulty: "Easy",
-        points: 75,
-        createdAt: "2026-09-12T10:00:00.000Z",
-      },
-      {
-        assignmentId: "asg-lru-cache",
-        title: "Lab 3: O(1) Cache Eviction Pointer Unlink",
-        challengeId: "lru-cache-eviction",
-        dueDate: "Due in 2 Weeks",
-        track: "PRODUCTION_SWE",
-        difficulty: "Medium",
-        points: 100,
-        createdAt: "2026-09-19T10:00:00.000Z",
-      },
-    ],
-    students: [],
-  },
-];
+export * from "./campus-data";
+import { SEEDED_COHORTS, type Cohort, type CohortAssignment, type CohortStudent, type CohortSubmission } from "./campus-data";
 
 // ── Database Accessors ────────────────────────────────────────────────────────
 
-export async function getCohortsForUser(userId: string) {
+export async function getCohortsForUser(userId: string, isAdmin = false) {
   const userCohorts: Cohort[] = [];
 
   try {
@@ -160,7 +25,7 @@ export async function getCohortsForUser(userId: string) {
 
     const enrolledCodes = (enrollRes.Items || []).map((it) => it.code);
 
-    // 2. Fetch created cohorts by user
+    // 2. Fetch created cohorts
     const scanRes = await dynamo.send(
       new ScanCommand({
         TableName: TABLE,
@@ -175,7 +40,7 @@ export async function getCohortsForUser(userId: string) {
     const allDbCohorts = scanRes.Items || [];
 
     for (const c of allDbCohorts) {
-      if (c.instructorId === userId || enrolledCodes.includes(c.code)) {
+      if (isAdmin || c.instructorId === userId || enrolledCodes.includes(c.code)) {
         userCohorts.push({
           code: c.code,
           title: c.title,
@@ -194,28 +59,26 @@ export async function getCohortsForUser(userId: string) {
     console.error("Failed to query cohorts from database:", err);
   }
 
-  // Combine with default seeded cohorts if not already present
-  const combined = [...userCohorts];
-  for (const demo of SEEDED_COHORTS) {
-    if (!combined.some((c) => c.code === demo.code)) {
-      combined.push({
-        code: demo.code,
-        title: demo.title,
-        department: demo.department,
-        institution: demo.institution,
-        instructorId: demo.instructorId,
-        instructorName: demo.instructorName,
-        description: demo.description,
-        createdAt: demo.createdAt,
-        studentCount: demo.studentCount,
-        assignmentsCount: demo.assignmentsCount,
-        isDemo: true,
-      });
-    }
+  // Return user's cohorts, or provide seeded course cohorts so they can immediately explore and enroll
+  if (userCohorts.length === 0) {
+    return SEEDED_COHORTS.map((c) => ({
+      code: c.code,
+      title: c.title,
+      department: c.department,
+      institution: c.institution,
+      instructorId: c.instructorId,
+      instructorName: c.instructorName,
+      description: c.description,
+      createdAt: c.createdAt,
+      studentCount: c.studentCount,
+      assignmentsCount: c.assignmentsCount,
+    }));
   }
 
-  return combined;
+  // Return user's authentic cohorts (or all cohorts for administrators)
+  return userCohorts;
 }
+
 
 export async function getCohortByCode(code: string, currentUserId?: string) {
   const cleanCode = code.toUpperCase().trim();
@@ -265,7 +128,8 @@ export async function getCohortByCode(code: string, currentUserId?: string) {
         createdAt: demoCohort!.createdAt,
         studentCount: demoCohort!.studentCount,
         assignmentsCount: demoCohort!.assignmentsCount,
-        isDemo: true,
+        // Only mark as demo if there's no authenticated user (guest preview)
+        ...(currentUserId ? {} : { isDemo: true }),
       };
 
   // Fetch assignments
@@ -319,7 +183,7 @@ export async function getCohortByCode(code: string, currentUserId?: string) {
         userId: s.userId,
         username: s.username,
         avatar: s.avatar ?? null,
-        elo: Number(s.elo || 1200),
+        elo: Number(s.elo || STARTING_ELO),
         enrolledAt: s.enrolledAt,
         role: s.role || "STUDENT",
         completedAssignmentsCount: Number(s.completedAssignmentsCount || 0),
@@ -333,37 +197,133 @@ export async function getCohortByCode(code: string, currentUserId?: string) {
     students = demoCohort.students;
   }
 
-  // Fetch current user's submissions
+  // Fetch all submissions for real analytics and gradebook
+  let allSubmissions: Array<{
+    userId: string;
+    username: string;
+    assignmentId: string;
+    status: string;
+    timeTakenSeconds: number;
+    passedAt: string;
+  }> = [];
   let userSubmissions: Record<string, boolean> = {};
-  if (currentUserId) {
-    try {
-      const subRes = await dynamo.send(
-        new QueryCommand({
-          TableName: TABLE,
-          KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
-          ExpressionAttributeValues: {
-            ":pk": `COHORT#${cleanCode}`,
-            ":skPrefix": `SUBMISSION#`,
-          },
-        })
-      );
-      if (subRes.Items) {
-        for (const item of subRes.Items) {
-          if (item.userId === currentUserId && item.status === "PASSED") {
-            userSubmissions[item.assignmentId] = true;
-          }
+
+  try {
+    const subRes = await dynamo.send(
+      new QueryCommand({
+        TableName: TABLE,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :skPrefix)",
+        ExpressionAttributeValues: {
+          ":pk": `COHORT#${cleanCode}`,
+          ":skPrefix": `SUBMISSION#`,
+        },
+      })
+    );
+    if (subRes.Items) {
+      allSubmissions = subRes.Items.map((item) => ({
+        userId: item.userId,
+        username: item.username || "Student",
+        assignmentId: item.assignmentId,
+        status: item.status || "PASSED",
+        timeTakenSeconds: Number(item.timeTakenSeconds || 0),
+        passedAt: item.passedAt || "",
+      }));
+
+      for (const item of allSubmissions) {
+        if (currentUserId && item.userId === currentUserId && item.status === "PASSED") {
+          userSubmissions[item.assignmentId] = true;
         }
       }
-    } catch (err) {
-      console.error("Failed to fetch user submissions:", err);
+    }
+  } catch (err) {
+    console.error("Failed to fetch cohort submissions:", err);
+  }
+
+  if (allSubmissions.length === 0 && demoCohort) {
+    allSubmissions = demoCohort.students.flatMap((s, sIdx) => {
+      const subs = [];
+      if (s.completedAssignmentsCount >= 1 && assignments[0]) {
+        subs.push({
+          userId: s.userId,
+          username: s.username,
+          assignmentId: assignments[0].assignmentId,
+          status: "PASSED",
+          timeTakenSeconds: 180 + ((sIdx * 17) % 110),
+          passedAt: new Date(Date.now() - 3600000 * 48 + sIdx * 3600000).toISOString(),
+        });
+      }
+      if (s.completedAssignmentsCount >= 2 && assignments[1]) {
+        subs.push({
+          userId: s.userId,
+          username: s.username,
+          assignmentId: assignments[1].assignmentId,
+          status: "PASSED",
+          timeTakenSeconds: 220 + ((sIdx * 23) % 130),
+          passedAt: new Date(Date.now() - 3600000 * 24 + sIdx * 3600000).toISOString(),
+        });
+      }
+      if (s.completedAssignmentsCount >= 3 && assignments[2]) {
+        subs.push({
+          userId: s.userId,
+          username: s.username,
+          assignmentId: assignments[2].assignmentId,
+          status: "PASSED",
+          timeTakenSeconds: 275 + ((sIdx * 19) % 140),
+          passedAt: new Date(Date.now() - 3600000 * 12 + sIdx * 3600000).toISOString(),
+        });
+      }
+      if (s.completedAssignmentsCount >= 4 && assignments[3]) {
+        subs.push({
+          userId: s.userId,
+          username: s.username,
+          assignmentId: assignments[3].assignmentId,
+          status: "PASSED",
+          timeTakenSeconds: 310 + ((sIdx * 29) % 160),
+          passedAt: new Date(Date.now() - 3600000 * 4 + sIdx * 3600000).toISOString(),
+        });
+      }
+      return subs;
+    });
+
+    if (!currentUserId && assignments[0]) {
+      userSubmissions[assignments[0].assignmentId] = true;
     }
   }
+
+  // Calculate real student completed assignment counts
+  const completedByStudent: Record<string, number> = {};
+  for (const sub of allSubmissions) {
+    if (sub.status === "PASSED") {
+      completedByStudent[sub.userId] = (completedByStudent[sub.userId] || 0) + 1;
+    }
+  }
+
+  const updatedStudents = students.map((stu) => ({
+    ...stu,
+    completedAssignmentsCount: completedByStudent[stu.userId] ?? stu.completedAssignmentsCount ?? 0,
+  }));
+
+  const totalSubmissions = allSubmissions.length;
+  const totalTime = allSubmissions.reduce((acc, it) => acc + it.timeTakenSeconds, 0);
+  const avgTimeSeconds = totalSubmissions > 0 ? Math.round(totalTime / totalSubmissions) : 245;
+  const computedPassRate = totalSubmissions > 0 && updatedStudents.length > 0 && assignments.length > 0
+    ? Math.min(100, Math.round((totalSubmissions / (updatedStudents.length * assignments.length)) * 100))
+    : (demoCohort ? 84 : 0);
+
+  const stats = {
+    totalStudents: updatedStudents.length,
+    totalSubmissions,
+    avgTimeSeconds,
+    passRate: computedPassRate,
+  };
 
   return {
     ...baseCohort,
     assignments,
-    students: students.sort((a, b) => b.elo - a.elo),
+    students: updatedStudents.sort((a, b) => b.elo - a.elo),
     userSubmissions,
+    allSubmissions,
+    stats,
   };
 }
 
@@ -434,12 +394,45 @@ export async function createCohort(params: {
 
 export async function joinCohort(code: string, user: { id: string; name: string; avatar: string | null; elo: number }) {
   const cleanCode = code.toUpperCase().trim();
-  const cohort = await getCohortByCode(cleanCode);
+  const cohort = await getCohortByCode(cleanCode, user.id);
   if (!cohort) {
     throw new Error(`Cohort code "${cleanCode}" not found.`);
   }
 
   const now = new Date().toISOString();
+
+  // Ensure cohort metadata exists in DynamoDB so enrollment and assignments are fully operational
+  try {
+    const metaRes = await dynamo.send(
+      new GetCommand({ TableName: TABLE, Key: { PK: `COHORT#${cleanCode}`, SK: "METADATA" } })
+    );
+    if (!metaRes.Item) {
+      const seeded = SEEDED_COHORTS.find((c) => c.code === cleanCode);
+      if (seeded) {
+        await dynamo.send(
+          new PutCommand({
+            TableName: TABLE,
+            Item: {
+              PK: `COHORT#${cleanCode}`,
+              SK: "METADATA",
+              code: seeded.code,
+              title: seeded.title,
+              department: seeded.department,
+              institution: seeded.institution,
+              instructorId: seeded.instructorId,
+              instructorName: seeded.instructorName,
+              description: seeded.description,
+              createdAt: seeded.createdAt,
+              studentCount: (seeded.studentCount || 0) + 1,
+              assignmentsCount: seeded.assignmentsCount,
+            },
+          })
+        );
+      }
+    }
+  } catch (mErr) {
+    console.warn("Could not sync cohort metadata on join:", mErr);
+  }
 
   // Check if student already enrolled
   const existing = await dynamo.send(
@@ -460,7 +453,7 @@ export async function joinCohort(code: string, user: { id: string; name: string;
           userId: user.id,
           username: user.name,
           avatar: user.avatar,
-          elo: user.elo || 1200,
+          elo: user.elo || STARTING_ELO,
           enrolledAt: now,
           role: "STUDENT",
           completedAssignmentsCount: 0,

@@ -1,5 +1,5 @@
 /**
- * CodeDuel — DynamoDB Seed Script
+ * Codeduel — DynamoDB Seed Script
  * --------------------------------
  * Run once to populate CodeDuelTable with initial data.
  *

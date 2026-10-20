@@ -10,19 +10,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const decoded = decodeURIComponent(username);
 
   return {
-    title: `${decoded} | CodeDuel Verified Debugging Portfolio`,
-    description: `Verified competitive debugging profile for ${decoded} on CodeDuel. Inspect ELO rating, embedded/software track breakdown, and verified competencies.`,
+    title: `${decoded} | Codeduel Verified Debugging Portfolio`,
+    description: `Verified competitive debugging profile for ${decoded} on Codeduel. Inspect ELO rating, embedded/software track breakdown, and verified competencies.`,
     openGraph: {
-      title: `${decoded} — CodeDuel Verified Portfolio`,
-      description: `View verified debugging competencies, ELO rating, and match records for ${decoded} on CodeDuel.`,
+      title: `${decoded} — Codeduel Verified Portfolio`,
+      description: `View verified debugging competencies, ELO rating, and match records for ${decoded} on Codeduel.`,
       url: `https://codeduel.dev/u/${encodeURIComponent(decoded)}`,
-      siteName: "CodeDuel",
+      siteName: "Codeduel",
       type: "profile",
     },
     twitter: {
       card: "summary_large_image",
-      title: `${decoded} — CodeDuel Verified Portfolio`,
-      description: `View verified debugging competencies, ELO rating, and match records for ${decoded} on CodeDuel.`,
+      title: `${decoded} — Codeduel Verified Portfolio`,
+      description: `View verified debugging competencies, ELO rating, and match records for ${decoded} on Codeduel.`,
     },
   };
 }

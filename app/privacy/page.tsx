@@ -1,36 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import AppNavbar from "@/components/AppNavbar";
 
 export default function PrivacyPolicyPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#050508", color: "#f5f4f8", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
       {/* NAVIGATION */}
-      <nav
-        style={{
-          height: "56px",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "0 28px",
-          background: "rgba(0,0,0,0.85)",
-          backdropFilter: "blur(20px)",
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        <Link href="/" style={{ textDecoration: "none", color: "#fff", fontWeight: 800, fontSize: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-          Code<span style={{ color: "#8b8eff" }}>Duel</span>
-        </Link>
-        <div style={{ display: "flex", gap: "20px", fontSize: "13px" }}>
-          <Link href="/practice" style={{ color: "#8a8898", textDecoration: "none" }}>Practice</Link>
-          <Link href="/campus" style={{ color: "#8a8898", textDecoration: "none" }}>Campus</Link>
-          <Link href="/pricing" style={{ color: "#8a8898", textDecoration: "none" }}>Pricing</Link>
-          <Link href="/terms" style={{ color: "#8a8898", textDecoration: "none" }}>Terms</Link>
-        </div>
-      </nav>
+      <AppNavbar />
 
       {/* CONTENT */}
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "60px 24px 100px", lineHeight: "1.7", fontSize: "14.5px", color: "#c2c0d0" }}>
@@ -49,8 +26,8 @@ export default function PrivacyPolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#fff", margin: "24px 0 12px" }}>1. Introduction &amp; Commitment</h2>
           <p>
-            CodeDuel (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the Platform&rdquo;) is committed to protecting the privacy of our users, students, educators, and institutional partners. 
-            This Privacy Policy sets out how we collect, process, store, and safeguard your data when you access CodeDuel, in accordance with the <strong>Digital Personal Data Protection (DPDP) Act, 2023 (India)</strong>, the <strong>General Data Protection Regulation (GDPR)</strong>, and applicable international data privacy standards.
+            Codeduel (&ldquo;we&rdquo;, &ldquo;our&rdquo;, or &ldquo;the Platform&rdquo;) is committed to protecting the privacy of our users, students, educators, and institutional partners. 
+            This Privacy Policy sets out how we collect, process, store, and safeguard your data when you access Codeduel, in accordance with the <strong>Digital Personal Data Protection (DPDP) Act, 2023 (India)</strong>, the <strong>General Data Protection Regulation (GDPR)</strong>, and applicable international data privacy standards.
           </p>
         </section>
 
@@ -106,19 +83,19 @@ export default function PrivacyPolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#fff", margin: "24px 0 12px" }}>7. Grievance Officer &amp; Contact</h2>
           <p>
-            Pursuant to the Information Technology Act, 2000 and the DPDP Act, 2023, the designated Grievance Officer for CodeDuel is:
+            Pursuant to the Information Technology Act, 2000 and the DPDP Act, 2023, the designated Grievance Officer for Codeduel is:
           </p>
           <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "16px 20px", marginTop: "12px", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }}>
-            <p style={{ margin: "0 0 6px", color: "#fff", fontWeight: 600 }}>Grievance Officer, CodeDuel</p>
-            <p style={{ margin: "0 0 4px", color: "#8a8898" }}>Punjab Engineering College (PEC), Sector 12</p>
-            <p style={{ margin: "0 0 4px", color: "#8a8898" }}>Chandigarh 160012, India</p>
+            <p style={{ margin: "0 0 6px", color: "#fff", fontWeight: 600 }}>Grievance Officer, Codeduel</p>
+            <p style={{ margin: "0 0 4px", color: "#8a8898" }}>Codeduel Inc., Legal &amp; Compliance</p>
+            <p style={{ margin: "0 0 4px", color: "#8a8898" }}>San Francisco, CA &amp; Remote Operations</p>
             <p style={{ margin: 0, color: "#8b8eff" }}>Email: privacy@codeduel.com / team@codeduel.com</p>
           </div>
         </section>
 
         <div style={{ marginTop: "48px", paddingTop: "24px", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
           <Link href="/terms" style={{ color: "#8b8eff", textDecoration: "none" }}>Read Terms of Service →</Link>
-          <Link href="/" style={{ color: "#8a8898", textDecoration: "none" }}>Back to CodeDuel Home</Link>
+          <Link href="/" style={{ color: "#8a8898", textDecoration: "none" }}>Back to Codeduel Home</Link>
         </div>
       </main>
     </div>

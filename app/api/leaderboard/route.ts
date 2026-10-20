@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
+import { STARTING_ELO } from "@/lib/elo";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export async function GET() {
           userId: currentUserId,
           username: userProf.Item.username ?? session?.user?.name ?? "Developer",
           avatar: userProf.Item.avatar ?? session?.user?.image ?? null,
-          GSI1SK: Number(userProf.Item.elo ?? 1200),
+          GSI1SK: Number(userProf.Item.elo ?? STARTING_ELO),
           track: "PRODUCTION_SWE",
           wins: Number(userProf.Item.wins ?? 0),
           losses: Number(userProf.Item.losses ?? 0),
@@ -53,7 +54,7 @@ export async function GET() {
       userId: item.userId,
       username: item.username,
       avatar: item.avatar ?? null,
-      elo: Number(item.GSI1SK ?? item.elo ?? 1200),
+      elo: Number(item.GSI1SK ?? item.elo ?? STARTING_ELO),
       track: item.track ?? (index % 2 === 0 ? "EMBEDDED_SYSTEMS" : "PRODUCTION_SWE"),
       wins: Number(item.wins ?? 0),
       losses: Number(item.losses ?? 0),

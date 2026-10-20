@@ -8,7 +8,7 @@ import { SEED_CHALLENGES } from "../lib/challenges";
 
 async function seedDemoData() {
   console.log("=================================================");
-  console.log("CODEDUEL DEMO SEEDER (POSTGRES / DYNAMO / LOCAL)");
+  console.log("Codeduel DEMO SEEDER (POSTGRES / DYNAMO / LOCAL)");
   console.log("=================================================\n");
 
   // 1. Seed Top Competitors on Leaderboard (High-tier verified engineers)

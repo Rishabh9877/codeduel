@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession, signOut, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useMemo } from "react";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
+import RoleBadgeSwitcher from "@/components/RoleBadgeSwitcher";
+import AppNavbar from "@/components/AppNavbar";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -103,11 +105,12 @@ function computeTrophies(wins: number, elo: number, totalMatches: number) {
 
 // ── Rank label ──────────────────────────────────────────────────────────────
 function eloRank(elo: number) {
-  if (elo >= 2200) return { label: "GRANDMASTER", color: "#fbbf24" };
-  if (elo >= 1800) return { label: "MASTER",      color: "#a78bfa" };
-  if (elo >= 1400) return { label: "EXPERT",      color: "#38bdf8" };
-  if (elo >= 1100) return { label: "ADVANCED",    color: "#4ade80" };
-  return               { label: "BEGINNER",    color: "#94a3b8" };
+  if (elo >= 1800) return { label: "MASTER",      color: "#f43f5e" };
+  if (elo >= 1600) return { label: "DIAMOND",     color: "#a855f7" };
+  if (elo >= 1400) return { label: "PLATINUM",    color: "#38bdf8" };
+  if (elo >= 1200) return { label: "GOLD",        color: "#fbbf24" };
+  if (elo >= 1000) return { label: "SILVER",      color: "#94a3b8" };
+  return               { label: "BRONZE",      color: "#cd7f32" };
 }
 
 // ── Main Page ───────────────────────────────────────────────────────────────
@@ -123,8 +126,6 @@ export default function ProfilePage() {
   const [showMatchHistory, setShowMatchHistory] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
-
-  useEffect(() => { if (status === "unauthenticated") router.push("/"); }, [status, router]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
@@ -158,11 +159,90 @@ export default function ProfilePage() {
     }
   };
 
-  if (status === "loading" || loading) return (
+  if (status === "loading" || (status === "authenticated" && loading)) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0b0c0e", color: "#fff", fontFamily: "JetBrains Mono, monospace", fontSize: 14 }}>
       Loading profile…
     </div>
   );
+
+  if (status === "unauthenticated") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0b0c0e", color: "#f5f3ec", display: "flex", flexDirection: "column", fontFamily: "system-ui, -apple-system, sans-serif" }}>
+        <header style={{ height: 56, borderBottom: "1px solid #2a2c30", background: "#0b0c0e", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 28px", position: "sticky", top: 0, zIndex: 50 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <Link href="/" style={{ color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: "15px" }}>
+              Codeduel
+            </Link>
+            <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "100px", background: "rgba(139,142,255,0.12)", color: "#8b8eff", border: "1px solid rgba(139,142,255,0.25)", fontFamily: "'JetBrains Mono', monospace" }}>
+              Profile
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: "16px", alignItems: "center", fontSize: "13px" }}>
+            <Link href="/practice" style={{ color: "#8a8c82", textDecoration: "none" }}>Practice Solo</Link>
+            <Link href="/leaderboard" style={{ color: "#8a8c82", textDecoration: "none" }}>Leaderboard</Link>
+            <Link href="/pricing" style={{ color: "#8a8c82", textDecoration: "none" }}>Pricing</Link>
+          </div>
+        </header>
+
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+          <div style={{ maxWidth: "520px", width: "100%", background: "#111317", border: "1px solid #2a2c30", borderRadius: "16px", padding: "36px 32px", textAlign: "center", boxShadow: "0 20px 50px rgba(0,0,0,0.6)" }}>
+            <div style={{ width: "52px", height: "52px", borderRadius: "14px", background: "rgba(139,142,255,0.12)", border: "1px solid rgba(139,142,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", margin: "0 auto 20px" }}>
+              👤
+            </div>
+            <h1 style={{ fontSize: "24px", fontWeight: 700, letterSpacing: "-0.03em", marginBottom: "10px", color: "#fff" }}>
+              Your Developer Profile
+            </h1>
+            <p style={{ fontSize: "14px", color: "#8a8c82", lineHeight: 1.6, marginBottom: "28px" }}>
+              Sign in with GitHub to view your calibrated ELO rating, duel match history, earned trophy badges, and public portfolio share link.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <button
+                onClick={() => signIn("github")}
+                style={{
+                  background: "#8b8eff",
+                  color: "#000",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  padding: "12px 20px",
+                  borderRadius: "8px",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+                </svg>
+                Sign In with GitHub ⚡
+              </button>
+              <Link
+                href="/practice"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "#f5f3ec",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  padding: "11px 20px",
+                  borderRadius: "8px",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                }}
+              >
+                Practice Solo Without Account →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!profile) return null;
 
@@ -174,7 +254,7 @@ export default function ProfilePage() {
 
   const eloChartData = profile.eloHistory.length >= 2
     ? profile.eloHistory
-    : [{ label: "Start", fullDate: "Start", elo: 1200 }, { label: "Now", fullDate: "Now", elo: profile.elo }];
+    : [{ label: "Start", fullDate: "Start", elo: 1000 }, { label: "Now", fullDate: "Now", elo: profile.elo }];
 
   const S: Record<string, React.CSSProperties> = {
     page:      { minHeight: "100vh", background: "#0b0c0e", color: "#f5f3ec", fontFamily: "'JetBrains Mono', monospace" },
@@ -204,33 +284,11 @@ export default function ProfilePage() {
 
       <div style={S.page}>
         {/* NAV */}
-        <nav style={S.nav}>
-          <Link href="/" style={S.brand}>CodeDuel</Link>
-          <div style={S.navLinks}>
-            <Link href="/dashboard" style={S.navLink}>Dashboard</Link>
-            <Link href="/practice" style={S.navLink}>Solo</Link>
-            <Link href="/leaderboard" style={S.navLink}>Leaderboard</Link>
-            <Link href="/campus" style={S.navLink}>Campus</Link>
-            <Link href="/friends" style={S.navLink}>Friends</Link>
-            <Link href="/profile" style={S.navLinkAct}>Profile</Link>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {matchState === "queued"
-              ? <button onClick={handleCancel} style={{ background: "rgba(248,113,113,0.15)", border: "1px solid rgba(248,113,113,0.4)", color: "#f87171", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Cancel search</button>
-              : <button onClick={() => router.push("/dashboard?action=find_match")} style={{ background: "#7c3aed", border: "none", color: "#fff", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontFamily: "inherit", fontWeight: 600 }}>⚡ Find Match</button>
-            }
-            <div style={{ position: "relative" }}>
-              <div onClick={() => setShowProfileMenu(v => !v)} style={{ width: 32, height: 32, borderRadius: "50%", border: "1px solid #2a2c30", overflow: "hidden", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "#1a1c20", fontSize: 13, fontWeight: 600 }}>
-                {session?.user?.image ? <img src={session.user.image} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : (session?.user?.name?.[0] ?? "?").toUpperCase()}
-              </div>
-              {showProfileMenu && (
-                <div style={{ position: "absolute", top: "100%", right: 0, marginTop: 8, background: "#111317", border: "1px solid #2a2c30", borderRadius: 8, overflow: "hidden", zIndex: 50 }}>
-                  <button onClick={() => signOut({ callbackUrl: "/" })} style={{ background: "none", border: "none", color: "#f87171", padding: "10px 20px", cursor: "pointer", fontSize: 12, fontFamily: "inherit", whiteSpace: "nowrap" }}>Sign Out</button>
-                </div>
-              )}
-            </div>
-          </div>
-        </nav>
+        <AppNavbar
+          activePage="profile"
+          matchState={matchState}
+          onCancelMatch={handleCancel}
+        />
 
         <main style={S.main}>
           {/* PROFILE HEADER */}
@@ -498,7 +556,7 @@ export default function ProfilePage() {
                     profile.wins >= 50  && { label: "50 Production Tickets Patched",   date: "Achievement" },
                     profile.wins >= 10  && { label: "10 Production Tickets Patched",   date: "Achievement" },
                     profile.wins >= 1   && { label: "First Production PR Merged",      date: "Achievement" },
-                    profile.joinedAt    && { label: "Joined CodeDuel Battleground",     date: new Date(profile.joinedAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) },
+                    profile.joinedAt    && { label: "Joined Codeduel Battleground",     date: new Date(profile.joinedAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) },
                   ].filter(Boolean).slice(0, 5).map((m: any, i) => (
                     <div key={i} style={{ position: "relative", marginBottom: 20 }}>
                       <div style={{ position: "absolute", left: -20, top: 4, width: 8, height: 8, borderRadius: "50%", background: i === 0 ? "#8b8eff" : "#2a2c30", border: `2px solid ${i === 0 ? "#8b8eff" : "#3a3c40"}` }} />

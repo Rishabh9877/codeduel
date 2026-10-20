@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { GetCommand, PutCommand, ScanCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { STARTING_ELO } from "@/lib/elo";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,12 @@ export async function GET() {
       new GetCommand({ TableName: TABLE, Key: { PK: `USER#${userId}`, SK: "PROFILE" } })
     );
 
+    const rawUsername = (session.user.name || "").toLowerCase();
+    const isAdminUser =
+      rawUsername === "rishabh9877" ||
+      userId === "Rishabh9877" ||
+      (session.user?.email && session.user.email === process.env.ADMIN_EMAIL);
+
     if (!profileRes.Item) {
       const username = session.user.name ?? "Developer";
       const avatar = session.user.image ?? null;
@@ -30,7 +37,9 @@ export async function GET() {
         username,
         email: session.user.email ?? null,
         avatar,
-        elo: 1200,
+        elo: STARTING_ELO,
+        role: isAdminUser ? "ADMIN" : "INDIVIDUAL",
+        isAdmin: isAdminUser,
         wins: 0,
         losses: 0,
         skillsPracticed: [],
@@ -46,7 +55,7 @@ export async function GET() {
             PK: `USER#${userId}`,
             SK: "LEADERBOARD",
             GSI1PK: "LEADERBOARD#GLOBAL",
-            GSI1SK: 1200,
+            GSI1SK: STARTING_ELO,
             userId,
             username,
             avatar,
@@ -59,7 +68,11 @@ export async function GET() {
     }
 
     const dynItem = profileRes.Item;
-    const currentElo = Number(dynItem.elo ?? 1200);
+    if (isAdminUser && !dynItem.role) {
+      dynItem.role = "ADMIN";
+      dynItem.isAdmin = true;
+    }
+    const currentElo = Number(dynItem.elo ?? STARTING_ELO);
     const wins = Number(dynItem.wins ?? 0);
     const losses = Number(dynItem.losses ?? 0);
     const totalMatches = wins + losses;
@@ -136,15 +149,15 @@ export async function GET() {
 
     // 5 — Real ELO History
     const eloHistory = [
-      { label: "Start", fullDate: "Account Created", elo: 1200 }
+      { label: "Start", fullDate: "Account Created", elo: STARTING_ELO }
     ];
-    let rollingElo = 1200;
+    let rollingElo = STARTING_ELO;
     // Walk from oldest to newest
     const chronological = [...userMatches].reverse();
     for (let i = 0; i < chronological.length; i++) {
       const m = chronological[i];
       const isWin = m.winnerId === userId;
-      const eloAfter = isWin ? (m.newWinnerElo ?? (rollingElo + 16)) : (m.newLoserElo ?? Math.max(800, rollingElo - 16));
+      const eloAfter = isWin ? (m.newWinnerElo ?? (rollingElo + 16)) : (m.newLoserElo ?? Math.max(600, rollingElo - 16));
       rollingElo = eloAfter;
       const d = new Date(m.finishedAt ?? m.startedAt ?? Date.now());
       eloHistory.push({
@@ -153,7 +166,7 @@ export async function GET() {
         elo: rollingElo,
       });
     }
-    if (eloHistory.length === 1 && currentElo !== 1200) {
+    if (eloHistory.length === 1 && currentElo !== STARTING_ELO) {
       eloHistory.push({ label: "Now", fullDate: "Current Rating", elo: currentElo });
     }
 
@@ -164,6 +177,9 @@ export async function GET() {
       avatar: dynItem.avatar ?? session.user.image ?? null,
       githubUrl: `https://github.com/${dynItem.username ?? session.user.name ?? "developer"}`,
       elo: currentElo,
+      role: dynItem.role || (isAdminUser ? "ADMIN" : "INDIVIDUAL"),
+      isAdmin: dynItem.role === "ADMIN",
+      canBeAdmin: Boolean(isAdminUser),
       peakElo,
       globalRank,
       wins,

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { dynamo, TABLE } from "@/lib/dynamo";
-import { PutCommand, UpdateCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, UpdateCommand, QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 
 export async function POST(req: Request) {
   try {
@@ -20,6 +20,20 @@ export async function POST(req: Request) {
     }
 
     const cleanCode = code.toUpperCase().trim();
+
+    // Verify student is enrolled in this cohort
+    const studentRes = await dynamo.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `COHORT#${cleanCode}`, SK: `STUDENT#${userId}` },
+      })
+    );
+    if (!studentRes.Item) {
+      return NextResponse.json(
+        { error: "Forbidden: You must be enrolled in this cohort before submitting assignments." },
+        { status: 403 }
+      );
+    }
     let targetAssignmentId = assignmentId;
 
     // If only challengeId was passed, find corresponding assignment in this cohort

@@ -1,373 +1,543 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { HardwareContext } from "@/lib/challenges";
 
-interface Props {
+export interface HardwarePanelProps {
   hardwareContext: HardwareContext;
+  challengeId?: string;
+  executionStatus?: "IDLE" | "RUNNING" | "FAILED" | "PASSED";
+  testsPassed?: number;
+  totalTests?: number;
+  userCode?: string;
   hiddenTestsCount?: number;
 }
 
-export function SimulatedHardwarePanel({ hardwareContext, hiddenTestsCount }: Props) {
+export function SimulatedHardwarePanel({
+  hardwareContext,
+  challengeId = "embedded-ring-buffer",
+  executionStatus = "IDLE",
+  testsPassed = 0,
+  totalTests = 3,
+  userCode = "",
+  hiddenTestsCount,
+}: HardwarePanelProps) {
   const [activeTab, setActiveTab] = useState<"waveform" | "registers" | "memory">("waveform");
 
-  const renderWaveform = () => {
-    const type = hardwareContext.waveformSvg || "generic";
+  // Bench Controls
+  const [isFrozen, setIsFrozen] = useState(false);
+  const [timebase, setTimebase] = useState<string>("500µs/div");
+  const [voltDiv, setVoltDiv] = useState<string>("1V/div");
+  const [injectedGlitch, setInjectedGlitch] = useState(false);
+  const [triggerCount, setTriggerCount] = useState(148);
 
-    if (type === "uart-overflow") {
-      return (
-        <svg viewBox="0 0 540 140" style={{ width: "100%", height: "auto", display: "block" }}>
-          {/* Grid lines */}
-          <line x1="40" y1="20" x2="520" y2="20" stroke="#1f2330" strokeWidth="1" strokeDasharray="4 4" />
-          <line x1="40" y1="65" x2="520" y2="65" stroke="#1f2330" strokeWidth="1" strokeDasharray="4 4" />
-          <line x1="40" y1="110" x2="520" y2="110" stroke="#1f2330" strokeWidth="1" strokeDasharray="4 4" />
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const phaseRef = useRef<number>(0);
 
-          {/* Time markers */}
-          <text x="40" y="14" fill="#525060" fontSize="9" fontFamily="JetBrains Mono">0µs</text>
-          <text x="160" y="14" fill="#525060" fontSize="9" fontFamily="JetBrains Mono">25µs</text>
-          <text x="280" y="14" fill="#525060" fontSize="9" fontFamily="JetBrains Mono">50µs</text>
-          <text x="400" y="14" fill="#525060" fontSize="9" fontFamily="JetBrains Mono">75µs</text>
-          <text x="500" y="14" fill="#525060" fontSize="9" fontFamily="JetBrains Mono">100µs</text>
+  const isSolved = executionStatus === "PASSED" || (testsPassed === totalTests && totalTests > 0);
+  const isRunning = executionStatus === "RUNNING";
 
-          {/* Channel 1: UART RX */}
-          <text x="4" y="44" fill="#38bdf8" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">RX</text>
-          <path
-            d="M 40 50 L 70 50 L 70 30 L 100 30 L 100 50 L 130 50 L 130 30 L 170 30 L 170 50 L 220 50 L 220 30 L 270 30 L 270 50 L 320 50 L 320 30 L 360 30 L 360 50 L 410 50 L 410 30 L 450 30 L 450 50 L 520 50"
-            fill="none"
-            stroke="#38bdf8"
-            strokeWidth="2"
-          />
-
-          {/* Glitch zone background */}
-          <rect x="340" y="24" width="160" height="85" fill="rgba(244,63,94,0.12)" stroke="rgba(244,63,94,0.4)" strokeDasharray="3 3" rx="4" />
-          <text x="350" y="38" fill="#f43f5e" fontSize="9" fontWeight="bold" fontFamily="JetBrains Mono">▲ OVERRUN: BUFFER FULL</text>
-
-          {/* Channel 2: OVERRUN ERROR (ORE) FLAG */}
-          <text x="4" y="94" fill="#f43f5e" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">ORE</text>
-          <path
-            d="M 40 100 L 340 100 L 340 75 L 520 75"
-            fill="none"
-            stroke="#f43f5e"
-            strokeWidth="2"
-          />
-
-          {/* Byte annotations */}
-          <text x="75" y="45" fill="#8b8eff" fontSize="8" fontFamily="JetBrains Mono">0x55</text>
-          <text x="135" y="45" fill="#8b8eff" fontSize="8" fontFamily="JetBrains Mono">0xAA</text>
-          <text x="225" y="45" fill="#8b8eff" fontSize="8" fontFamily="JetBrains Mono">0x10</text>
-          <text x="365" y="45" fill="#f87171" fontSize="8" fontFamily="JetBrains Mono">DROPPED</text>
-        </svg>
-      );
+  // Timebase multipliers for waveform speed
+  const getTimebaseSpeed = () => {
+    switch (timebase) {
+      case "50µs/div": return 0.18;
+      case "100µs/div": return 0.12;
+      case "500µs/div": return 0.06;
+      case "1ms/div": return 0.03;
+      case "5ms/div": return 0.01;
+      default: return 0.06;
     }
+  };
 
-    if (type === "gpio-bounce") {
-      return (
-        <svg viewBox="0 0 540 140" style={{ width: "100%", height: "auto", display: "block" }}>
-          {/* Time markers */}
-          <line x1="40" y1="20" x2="520" y2="20" stroke="#1f2330" strokeWidth="1" strokeDasharray="4 4" />
-          <line x1="40" y1="65" x2="520" y2="65" stroke="#1f2330" strokeWidth="1" strokeDasharray="4 4" />
-          <line x1="40" y1="110" x2="520" y2="110" stroke="#1f2330" strokeWidth="1" strokeDasharray="4 4" />
+  // ── 60 FPS HTML5 CANVAS WAVEFORM GENERATOR ─────────────────────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-          <text x="40" y="14" fill="#525060" fontSize="9" fontFamily="JetBrains Mono">0ms</text>
-          <text x="180" y="14" fill="#525060" fontSize="9" fontFamily="JetBrains Mono">5ms</text>
-          <text x="320" y="14" fill="#525060" fontSize="9" fontFamily="JetBrains Mono">10ms</text>
-          <text x="480" y="14" fill="#525060" fontSize="9" fontFamily="JetBrains Mono">15ms</text>
+    let running = true;
 
-          {/* Channel 1: RAW GPIO IN */}
-          <text x="4" y="44" fill="#fbbf24" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">PIN</text>
-          {/* Clean high, then bounce chatter, then stable low */}
-          <path
-            d="M 40 30 L 140 30 L 145 50 L 150 30 L 155 50 L 160 30 L 165 50 L 170 30 L 178 50 L 185 32 L 195 50 L 520 50"
-            fill="none"
-            stroke="#fbbf24"
-            strokeWidth="2"
-          />
+    const render = () => {
+      if (!running) return;
 
-          {/* Shaded chatter zone */}
-          <rect x="135" y="22" width="70" height="90" fill="rgba(244,63,94,0.12)" stroke="rgba(244,63,94,0.4)" strokeDasharray="3 3" rx="4" />
-          <text x="140" y="72" fill="#f43f5e" fontSize="8" fontWeight="bold" fontFamily="JetBrains Mono">▲ BOUNCE &lt; 5ms</text>
+      const width = canvas.width;
+      const height = canvas.height;
 
-          {/* Channel 2: DEBOUNCED STATE */}
-          <text x="4" y="94" fill="#4ade80" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">STABLE</text>
-          <path
-            d="M 40 85 L 205 85 L 205 105 L 520 105"
-            fill="none"
-            stroke="#4ade80"
-            strokeWidth="2"
-          />
-          <text x="220" y="100" fill="#4ade80" fontSize="8" fontFamily="JetBrains Mono">LATCHED AFTER THRESHOLD (5ms)</text>
-        </svg>
+      // Clear with dark oscilloscope phosphor background
+      ctx.fillStyle = "#070b0e";
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw Reticle Grid
+      ctx.strokeStyle = "rgba(40, 75, 60, 0.35)";
+      ctx.lineWidth = 1;
+
+      // Vertical div lines (10 divisions)
+      const vStep = width / 10;
+      for (let x = 0; x <= width; x += vStep) {
+        ctx.beginPath();
+        ctx.setLineDash([2, 4]);
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+
+      // Horizontal div lines (8 divisions)
+      const hStep = height / 8;
+      for (let y = 0; y <= height; y += hStep) {
+        ctx.beginPath();
+        ctx.setLineDash([2, 4]);
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      // Center crosshairs
+      ctx.strokeStyle = "rgba(74, 222, 128, 0.25)";
+      ctx.beginPath();
+      ctx.moveTo(width / 2, 0);
+      ctx.lineTo(width / 2, height);
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
+
+      if (!isFrozen) {
+        phaseRef.current += getTimebaseSpeed();
+      }
+      const phase = phaseRef.current;
+
+      // Draw Waveform based on Challenge Fault vs Solved State
+      ctx.lineWidth = 2.5;
+
+      if (isSolved) {
+        // SOLVED STATE: Crisp, nominal green trace (zero jitter/bounce)
+        ctx.strokeStyle = "#4ade80";
+        ctx.shadowColor = "rgba(74, 222, 128, 0.6)";
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+
+        for (let x = 0; x < width; x++) {
+          const t = (x / width) * 4 * Math.PI + phase;
+          // Clean square / smoothed PWM wave
+          const y = height / 2 + Math.sin(t) * 42 * (Math.abs(Math.sin(t)) > 0.3 ? 1 : 0.4);
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      } else {
+        // FAULT / UNRESOLVED STATE: Render specific anomaly
+        ctx.strokeStyle = injectedGlitch ? "#f43f5e" : "#fbbf24";
+        ctx.shadowColor = injectedGlitch ? "rgba(244, 63, 94, 0.7)" : "rgba(251, 191, 36, 0.5)";
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+
+        for (let x = 0; x < width; x++) {
+          const t = (x / width) * 4 * Math.PI + phase;
+          let y = height / 2;
+
+          if (challengeId === "embedded-gpio-debounce") {
+            // High frequency contact bounce chatter in middle
+            const isChatterZone = (x > width * 0.35 && x < width * 0.55);
+            if (isChatterZone) {
+              y += (Math.random() - 0.5) * 60; // 15ms chatter spikes
+            } else {
+              y += (x < width * 0.35 ? -38 : 38);
+            }
+          } else if (challengeId === "embedded-interrupt-race") {
+            // Torn read / glitch discontinuity
+            const isTornPoint = (Math.floor(x + phase * 20) % 180 < 8);
+            y += Math.sin(t) * 35;
+            if (isTornPoint || injectedGlitch) {
+              y += (Math.random() - 0.5) * 80; // Torn glitch spike
+            }
+          } else if (challengeId === "embedded-pwm-prescaler") {
+            // Half-frequency with excessive RC ripple
+            const slowT = (x / width) * 2 * Math.PI + phase * 0.5;
+            y += (Math.sin(slowT) > 0 ? 35 : -35) + Math.sin(x * 0.2) * 8;
+          } else if (challengeId === "embedded-packed-alignment") {
+            // Cortex-M0 HardFault flatline freeze
+            const faultZone = x > width * 0.45;
+            if (faultZone) {
+              y += 45; // Locked low on fault
+            } else {
+              y += Math.sin(t * 2) * 30;
+            }
+          } else {
+            // Default ring buffer / SPI noise trace
+            const hasOverrun = x > width * 0.6;
+            y += Math.sin(t) * 32 + (hasOverrun ? (Math.random() - 0.5) * 24 : 0);
+          }
+
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      // Live Trigger Status overlay on canvas
+      ctx.font = "10px JetBrains Mono, monospace";
+      ctx.fillStyle = isSolved ? "#4ade80" : (injectedGlitch ? "#f43f5e" : "#fbbf24");
+      ctx.fillText(
+        `TRIG: ${isSolved ? "AUTO (LOCKED)" : "NORMAL (FAULT)"} | ${timebase} | ${voltDiv}`,
+        12,
+        height - 12
       );
-    }
 
-    if (type === "spi-endian") {
-      return (
-        <svg viewBox="0 0 540 140" style={{ width: "100%", height: "auto", display: "block" }}>
-          {/* SCK Clock */}
-          <text x="4" y="38" fill="#38bdf8" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">SCK</text>
-          <path
-            d="M 40 45 L 60 45 L 60 25 L 75 25 L 75 45 L 90 45 L 90 25 L 105 25 L 105 45 L 120 45 L 120 25 L 135 25 L 135 45 L 150 45 L 150 25 L 165 25 L 165 45 L 180 45 L 180 25 L 195 25 L 195 45 L 230 45 L 230 25 L 245 25 L 245 45 L 260 45 L 260 25 L 275 25 L 275 45 L 290 45 L 290 25 L 305 25 L 305 45 L 340 45 L 520 45"
-            fill="none"
-            stroke="#38bdf8"
-            strokeWidth="1.5"
-          />
+      // Running strobe
+      if (isRunning) {
+        const scanX = (Date.now() / 3) % width;
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.8)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(scanX, 0);
+        ctx.lineTo(scanX, height);
+        ctx.stroke();
+      }
 
-          {/* MISO Data Line */}
-          <text x="4" y="80" fill="#c084fc" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">MISO</text>
-          <path
-            d="M 40 85 L 60 85 L 60 70 L 120 70 L 120 85 L 165 85 L 165 70 L 210 70 L 240 85 L 280 70 L 320 85 L 520 85"
-            fill="none"
-            stroke="#c084fc"
-            strokeWidth="2"
-          />
+      animFrameRef.current = requestAnimationFrame(render);
+    };
 
-          {/* Shaded byte swap warning */}
-          <rect x="55" y="60" width="145" height="50" fill="rgba(251,191,36,0.12)" stroke="rgba(251,191,36,0.4)" rx="4" />
-          <text x="65" y="100" fill="#fbbf24" fontSize="9" fontWeight="bold" fontFamily="JetBrains Mono">BYTE 0: MSB (0x0F)</text>
+    render();
 
-          <rect x="225" y="60" width="145" height="50" fill="rgba(56,189,248,0.12)" stroke="rgba(56,189,248,0.4)" rx="4" />
-          <text x="235" y="100" fill="#38bdf8" fontSize="9" fontWeight="bold" fontFamily="JetBrains Mono">BYTE 1: LSB (0xA0)</text>
+    return () => {
+      running = false;
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [isSolved, isRunning, isFrozen, timebase, voltDiv, injectedGlitch, challengeId]);
 
-          <text x="55" y="125" fill="#f43f5e" fontSize="9" fontWeight="bold" fontFamily="JetBrains Mono">
-            ⚠️ Swapping order causes raw = 0xA00F instead of 0x0FA0!
-          </text>
-        </svg>
-      );
-    }
+  // Inject glitch timeout
+  const handleInjectFault = () => {
+    setInjectedGlitch(true);
+    setTriggerCount((c) => c + 1);
+    setTimeout(() => setInjectedGlitch(false), 800);
+  };
 
-    if (type === "interrupt-race") {
-      return (
-        <svg viewBox="0 0 540 140" style={{ width: "100%", height: "auto", display: "block" }}>
-          {/* Main Loop Read */}
-          <text x="4" y="38" fill="#4ade80" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">MAIN</text>
-          <path d="M 40 35 L 220 35 L 220 50 L 360 50 L 360 35 L 520 35" fill="none" stroke="#4ade80" strokeWidth="2" />
-          <text x="60" y="30" fill="#4ade80" fontSize="9" fontFamily="JetBrains Mono">READ HIGH WORD</text>
-          <text x="375" y="30" fill="#4ade80" fontSize="9" fontFamily="JetBrains Mono">READ LOW WORD</text>
+  const handleSingleCapture = () => {
+    setIsFrozen(true);
+    setTriggerCount((c) => c + 1);
+  };
 
-          {/* ISR Trigger Pulse */}
-          <text x="4" y="82" fill="#f43f5e" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">IRQ</text>
-          <path d="M 40 90 L 240 90 L 240 68 L 330 68 L 330 90 L 520 90" fill="none" stroke="#f43f5e" strokeWidth="2" />
+  // ── HARDWARE REGISTER BITMASKS ──────────────────────────────────────────────
+  const renderRegisters = () => {
+    // Determine registers based on challenge and solved state
+    let cfsr = isSolved ? "0x00000000" : (challengeId === "embedded-packed-alignment" ? "0x01000000" : "0x00000000"); // Bit 24 = UNALIGNED
+    let hfsr = isSolved ? "0x00000000" : (challengeId === "embedded-packed-alignment" ? "0x40000000" : "0x00000000"); // Bit 30 = FORCED
+    let mmfar = isSolved ? "0x00000000" : (challengeId === "embedded-packed-alignment" ? "0x20000103" : "0x00000000");
+    let primask = isSolved ? "0x01" : (challengeId === "embedded-interrupt-race" ? "0x00" : "0x00"); // 0x00 = interrupts unmasked (vulnerable)
 
-          {/* Shaded collision area */}
-          <rect x="220" y="20" width="140" height="90" fill="rgba(244,63,94,0.15)" stroke="rgba(244,63,94,0.5)" strokeDasharray="3 3" rx="4" />
-          <text x="228" y="75" fill="#f43f5e" fontSize="8" fontWeight="bold" fontFamily="JetBrains Mono">▲ TORN READ CORRUPTION</text>
-          <text x="228" y="88" fill="#f43f5e" fontSize="8" fontFamily="JetBrains Mono">ISR updates 64-bit TS mid-read!</text>
-        </svg>
-      );
-    }
-
-    // Default / CAN alignment
     return (
-      <svg viewBox="0 0 540 140" style={{ width: "100%", height: "auto", display: "block" }}>
-        {/* Differential CAN Bus */}
-        <text x="4" y="35" fill="#38bdf8" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">CANH</text>
-        <path d="M 40 30 L 120 30 L 130 20 L 220 20 L 230 30 L 320 30 L 330 20 L 420 20 L 430 30 L 520 30" fill="none" stroke="#38bdf8" strokeWidth="2" />
+      <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#8b8eff", textTransform: "uppercase" }}>
+            ARM Cortex-M MMIO System Control Block (SCB)
+          </span>
+          <span style={{ fontSize: 10, fontFamily: "JetBrains Mono", color: isSolved ? "#4ade80" : "#f43f5e" }}>
+            {isSolved ? "● STATUS: NOMINAL (0 FAULTS)" : "▲ STATUS: FAULT ACTIVE"}
+          </span>
+        </div>
 
-        <text x="4" y="65" fill="#818cf8" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">CANL</text>
-        <path d="M 40 60 L 120 60 L 130 70 L 220 70 L 230 60 L 320 60 L 330 70 L 420 70 L 430 60 L 520 60" fill="none" stroke="#818cf8" strokeWidth="2" />
+        {/* CFSR Register Card */}
+        <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>CFSR (Configurable Fault Status)</span>
+            <span style={{ fontSize: 12, fontFamily: "JetBrains Mono", color: cfsr !== "0x00000000" ? "#f43f5e" : "#4ade80", fontWeight: 700 }}>
+              {cfsr}
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, fontSize: 10, fontFamily: "JetBrains Mono" }}>
+            <div style={{ background: cfsr === "0x01000000" ? "rgba(244,63,94,0.2)" : "rgba(255,255,255,0.03)", padding: 6, borderRadius: 4, color: cfsr === "0x01000000" ? "#f43f5e" : "#6e6d7a" }}>
+              Bit 24: UNALIGNED {cfsr === "0x01000000" ? "▲ TRIP" : "0"}
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.03)", padding: 6, borderRadius: 4, color: "#6e6d7a" }}>
+              Bit 25: DIVBYZERO 0
+            </div>
+            <div style={{ background: "rgba(255,255,255,0.03)", padding: 6, borderRadius: 4, color: "#6e6d7a" }}>
+              Bit 16: UNDEFINSTR 0
+            </div>
+          </div>
+        </div>
 
-        {/* HardFault Trigger */}
-        <text x="4" y="105" fill="#f43f5e" fontSize="10" fontWeight="bold" fontFamily="JetBrains Mono">FAULT</text>
-        <path d="M 40 115 L 260 115 L 260 92 L 520 92" fill="none" stroke="#f43f5e" strokeWidth="2" />
+        {/* HFSR & MMFAR */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 11, color: "#8a8898", marginBottom: 4 }}>HFSR (HardFault Status)</div>
+            <div style={{ fontSize: 13, fontFamily: "JetBrains Mono", fontWeight: 700, color: hfsr !== "0x00000000" ? "#f43f5e" : "#4ade80" }}>
+              {hfsr}
+            </div>
+            <div style={{ fontSize: 10, color: "#6e6d7a", marginTop: 4 }}>
+              Bit 30 (FORCED): {hfsr !== "0x00000000" ? "ESCALATED" : "CLEAR"}
+            </div>
+          </div>
 
-        <rect x="250" y="80" width="220" height="42" fill="rgba(244,63,94,0.18)" stroke="rgba(244,63,94,0.5)" rx="4" />
-        <text x="260" y="98" fill="#f43f5e" fontSize="9" fontWeight="bold" fontFamily="JetBrains Mono">⚠️ Cortex-M0 HardFault Triggered</text>
-        <text x="260" y="112" fill="#f87171" fontSize="8" fontFamily="JetBrains Mono">Unaligned uint32_t load at offset 0x03</text>
-      </svg>
+          <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 11, color: "#8a8898", marginBottom: 4 }}>MMFAR (Fault Address)</div>
+            <div style={{ fontSize: 13, fontFamily: "JetBrains Mono", fontWeight: 700, color: mmfar !== "0x00000000" ? "#f43f5e" : "#8a8898" }}>
+              {mmfar}
+            </div>
+            <div style={{ fontSize: 10, color: "#6e6d7a", marginTop: 4 }}>
+              Target: {mmfar !== "0x00000000" ? "ODD BYTE 0x20000103" : "0x00000000"}
+            </div>
+          </div>
+        </div>
+
+        {/* PRIMASK Interrupt Flag */}
+        <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: "#8a8898" }}>PRIMASK (Interrupt Mask Register)</span>
+            <span style={{ fontSize: 12, fontFamily: "JetBrains Mono", fontWeight: 700, color: isSolved ? "#4ade80" : (challengeId === "embedded-interrupt-race" ? "#f43f5e" : "#8b8eff") }}>
+              {primask} ({isSolved ? "ATOMIC_SAFE" : (challengeId === "embedded-interrupt-race" ? "UNPROTECTED_RACE" : "NORMAL")})
+            </span>
+          </div>
+          <p style={{ fontSize: 11, color: "#6e6d7a", margin: 0, lineHeight: 1.4 }}>
+            {isSolved
+              ? "Critical section wrapped in __get_PRIMASK() / __disable_irq() — safe against torn 64-bit reads."
+              : "Interrupts remain enabled during 64-bit multi-word load. Hardware ISR interrupts mid-word."}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  // ── LOGIC ANALYZER / 8-CHANNEL PULSE TRAIN ──────────────────────────────────
+  const renderLogicAnalyzer = () => {
+    const isFault = !isSolved;
+    const canFaultHigh = isFault && challengeId === "embedded-packed-alignment";
+    const irqPulsing = isFault && challengeId === "embedded-interrupt-race";
+
+    return (
+      <div style={{ padding: "14px 16px", background: "#050608", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: "#8a8898", textTransform: "uppercase", letterSpacing: 0.5 }}>
+            8-Channel Digital Logic Analyzer (40 MSPS)
+          </span>
+          <span style={{ fontSize: 10, color: "#6e6d7a", fontFamily: "JetBrains Mono" }}>
+            Trig: Ch4 / Edge: Falling
+          </span>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, fontFamily: "JetBrains Mono", fontSize: 10 }}>
+          {/* CH0: SCK */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 68, color: "#38bdf8", fontWeight: 700 }}>CH0: SCK</span>
+            <div style={{ flex: 1, height: 16, background: "rgba(56,189,248,0.06)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+              <svg width="100%" height="16">
+                <path d="M0,13 L20,13 L20,3 L40,3 L40,13 L60,13 L60,3 L80,3 L80,13 L100,13 L100,3 L120,3 L120,13 L140,13 L140,3 L160,3 L160,13 L180,13 L180,3 L200,3 L200,13 L220,13 L220,3 L240,3 L240,13 L260,13 L260,3 L280,3 L280,13 L300,13 L300,3 L320,3 L320,13 L340,13 L340,3 L360,3 L360,13 L380,13 L380,3 L400,3 L400,13" fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+              </svg>
+            </div>
+          </div>
+
+          {/* CH1: MOSI */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 68, color: "#c084fc", fontWeight: 700 }}>CH1: MOSI</span>
+            <div style={{ flex: 1, height: 16, background: "rgba(192,132,252,0.06)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+              <svg width="100%" height="16">
+                <path d="M0,13 L40,13 L40,3 L90,3 L90,13 L150,13 L150,3 L220,3 L220,13 L310,13 L310,3 L370,3 L370,13 L400,13" fill="none" stroke="#c084fc" strokeWidth="1.5" />
+              </svg>
+            </div>
+          </div>
+
+          {/* CH4: EXT_INT0 */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 68, color: irqPulsing ? "#f43f5e" : "#4ade80", fontWeight: 700 }}>CH4: INT0</span>
+            <div style={{ flex: 1, height: 16, background: irqPulsing ? "rgba(244,63,94,0.15)" : "rgba(74,222,128,0.06)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+              <svg width="100%" height="16">
+                {irqPulsing ? (
+                  <path d="M0,13 L30,13 L30,3 L50,3 L50,13 L80,13 L80,3 L100,3 L100,13 L140,13 L140,3 L155,3 L155,13 L230,13 L230,3 L250,3 L250,13 L350,13 L350,3 L370,3 L370,13" fill="none" stroke="#f43f5e" strokeWidth="2" />
+                ) : (
+                  <path d="M0,13 L120,13 L120,3 L140,3 L140,13 L280,13 L280,3 L300,3 L300,13 L400,13" fill="none" stroke="#4ade80" strokeWidth="1.5" />
+                )}
+              </svg>
+            </div>
+          </div>
+
+          {/* CH7: CAN_FAULT */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 68, color: canFaultHigh ? "#f43f5e" : "#6e6d7a", fontWeight: 700 }}>CH7: FAULT</span>
+            <div style={{ flex: 1, height: 16, background: canFaultHigh ? "rgba(244,63,94,0.2)" : "rgba(255,255,255,0.02)", borderRadius: 3, position: "relative" }}>
+              <svg width="100%" height="16">
+                <path
+                  d={canFaultHigh ? "M0,13 L80,13 L80,3 L400,3" : "M0,13 L400,13"}
+                  fill="none"
+                  stroke={canFaultHigh ? "#f43f5e" : "#4a4860"}
+                  strokeWidth="2"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0a0a10", color: "#e8e6f0" }}>
-      {/* ── MCU SPECS HEADER ──────────────────────────────────────────────── */}
-      <div style={{ padding: "14px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#08080d" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+      {/* ── CLOSED-LOOP STATUS HEADER ─────────────────────────────────────── */}
+      <div style={{ padding: "12px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#08080d" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#fbbf24" }}>⚡ TARGET CHIP:</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#fff", fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#fbbf24" }}>⚡ TARGET:</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "'JetBrains Mono', monospace" }}>
               {hardwareContext.mcu}
             </span>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
+
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontSize: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "2px 6px", color: "#8a8898", fontFamily: "JetBrains Mono" }}>
               {hardwareContext.clockSpeed}
             </span>
             <span style={{ fontSize: 10, background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.25)", borderRadius: 4, padding: "2px 6px", color: "#38bdf8", fontFamily: "JetBrains Mono" }}>
               {hardwareContext.busProtocol}
             </span>
-          </div>
-        </div>
 
-        {/* Failure Callout */}
-        <div style={{ background: "rgba(244,63,94,0.08)", border: "1px solid rgba(244,63,94,0.25)", borderRadius: 6, padding: "8px 12px", display: "flex", alignItems: "flex-start", gap: 8 }}>
-          <span style={{ fontSize: 13, color: "#f43f5e" }}>⚠️</span>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#f43f5e", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 2 }}>
-              Observed Hardware Glitch
-            </div>
-            <div style={{ fontSize: 11, color: "#fecdd3", lineHeight: 1.4 }}>
-              {hardwareContext.observedFailure}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── SUB-TABS ──────────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", background: "#0c0d16", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0 12px", gap: 4 }}>
-        <button
-          onClick={() => setActiveTab("waveform")}
-          style={{
-            background: activeTab === "waveform" ? "#151624" : "transparent",
-            border: "none",
-            borderBottom: activeTab === "waveform" ? "2px solid #fbbf24" : "2px solid transparent",
-            color: activeTab === "waveform" ? "#fbbf24" : "#8a8898",
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "8px 14px",
-            cursor: "pointer",
-            fontFamily: "JetBrains Mono",
-          }}
-        >
-          📈 Logic Analyzer / Scope
-        </button>
-        <button
-          onClick={() => setActiveTab("registers")}
-          style={{
-            background: activeTab === "registers" ? "#151624" : "transparent",
-            border: "none",
-            borderBottom: activeTab === "registers" ? "2px solid #8b8eff" : "2px solid transparent",
-            color: activeTab === "registers" ? "#8b8eff" : "#8a8898",
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "8px 14px",
-            cursor: "pointer",
-            fontFamily: "JetBrains Mono",
-          }}
-        >
-          🎛 Registers ({hardwareContext.registers?.length || 0})
-        </button>
-        <button
-          onClick={() => setActiveTab("memory")}
-          style={{
-            background: activeTab === "memory" ? "#151624" : "transparent",
-            border: "none",
-            borderBottom: activeTab === "memory" ? "2px solid #38bdf8" : "2px solid transparent",
-            color: activeTab === "memory" ? "#38bdf8" : "#8a8898",
-            fontSize: 11,
-            fontWeight: 700,
-            padding: "8px 14px",
-            cursor: "pointer",
-            fontFamily: "JetBrains Mono",
-          }}
-        >
-          🗺 Memory Map
-        </button>
-      </div>
-
-      {/* ── TAB CONTENT ───────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, padding: 16, overflowY: "auto" }}>
-        {activeTab === "waveform" && (
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#8a8898", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                Digital Timing Diagram (Logic 8 / 24MHz Sample Rate)
+            {/* LIVE CLOSED-LOOP EXECUTION BADGE */}
+            {isSolved ? (
+              <span style={{ fontSize: 10, background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.4)", color: "#4ade80", padding: "2px 8px", borderRadius: 4, fontWeight: 800, fontFamily: "JetBrains Mono" }}>
+                ✓ HARDWARE TELEMETRY VERIFIED — 0 FAULTS
               </span>
-              <span style={{ fontSize: 10, color: "#4ade80", fontFamily: "JetBrains Mono" }}>● LIVE TRACE CAPTURE</span>
-            </div>
-
-            <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12, marginBottom: 16 }}>
-              {renderWaveform()}
-            </div>
-
-            <div style={{ fontSize: 11, color: "#8a8898", lineHeight: 1.5, background: "rgba(255,255,255,0.02)", padding: 10, borderRadius: 6, border: "1px solid rgba(255,255,255,0.05)" }}>
-              💡 <strong>Hardware Debugging Insight:</strong> Real embedded engineers diagnose firmware bugs by correlating register values with external logic analyzer captures. Notice how the glitch aligns with boundary state updates.
-            </div>
+            ) : isRunning ? (
+              <span style={{ fontSize: 10, background: "rgba(56,189,248,0.15)", border: "1px solid rgba(56,189,248,0.4)", color: "#38bdf8", padding: "2px 8px", borderRadius: 4, fontWeight: 800, fontFamily: "JetBrains Mono" }}>
+                ⏳ SAMPLING PISTON SANDBOX...
+              </span>
+            ) : (
+              <span style={{ fontSize: 10, background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", color: "#f43f5e", padding: "2px 8px", borderRadius: 4, fontWeight: 800, fontFamily: "JetBrains Mono" }}>
+                ▲ FAULT ACTIVE ({testsPassed}/{totalTests} TESTS)
+              </span>
+            )}
           </div>
-        )}
+        </div>
 
-        {activeTab === "registers" && (
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#8a8898", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
-              Simulated Memory-Mapped I/O Registers
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {hardwareContext.registers?.map((reg) => (
-                <div
-                  key={reg.name}
-                  style={{
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    borderRadius: 6,
-                    padding: "8px 12px",
-                    fontFamily: "JetBrains Mono",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                    <span style={{ color: "#8b8eff", fontWeight: 700, fontSize: 12 }}>{reg.name}</span>
-                    <span style={{ color: "#4ade80", fontSize: 11 }}>{reg.value}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10, color: "#8a8898" }}>
-                    <span>Offset: {reg.address}</span>
-                    <span style={{ color: "#c8c6d4" }}>{reg.desc}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Observed Failure Banner */}
+        <div style={{ background: isSolved ? "rgba(74,222,128,0.06)" : "rgba(244,63,94,0.08)", border: `1px solid ${isSolved ? "rgba(74,222,128,0.25)" : "rgba(244,63,94,0.25)"}`, borderRadius: 6, padding: "7px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 12 }}>{isSolved ? "✅" : "⚠️"}</span>
+          <div style={{ fontSize: 11, color: isSolved ? "#bbf7d0" : "#fecdd3", lineHeight: 1.4 }}>
+            {isSolved
+              ? "All unit tests passed. MMIO fault registers cleared, clock domain stabilized at target frequency."
+              : hardwareContext.observedFailure}
           </div>
-        )}
-
-        {activeTab === "memory" && (
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#8a8898", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>
-              ARM Memory Architecture Map
-            </div>
-
-            {/* Visual Bar */}
-            <div style={{ display: "flex", height: 18, borderRadius: 4, overflow: "hidden", marginBottom: 14 }}>
-              <div style={{ flex: 4, background: "#38bdf8", opacity: 0.8 }} title="Flash ROM" />
-              <div style={{ flex: 2, background: "#4ade80", opacity: 0.8 }} title="SRAM" />
-              <div style={{ flex: 3, background: "#fbbf24", opacity: 0.8 }} title="Peripherals" />
-              <div style={{ flex: 1, background: "#c084fc", opacity: 0.8 }} title="Private Peripherals" />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {hardwareContext.memoryMap?.map((mem) => (
-                <div
-                  key={mem.region}
-                  style={{
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.05)",
-                    borderRadius: 6,
-                    padding: "8px 10px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    fontSize: 11,
-                    fontFamily: "JetBrains Mono",
-                  }}
-                >
-                  <div>
-                    <span style={{ fontWeight: 700, color: "#fff" }}>{mem.region}: </span>
-                    <span style={{ color: "#8a8898" }}>{mem.start} - {mem.end}</span>
-                  </div>
-                  <span style={{ color: "#8b8eff", fontSize: 10 }}>{mem.desc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* ── HIDDEN TEST SUITE FOOTER ───────────────────────────────────────── */}
-      {hiddenTestsCount && hiddenTestsCount > 0 ? (
-        <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(255,255,255,0.08)", background: "#08080d", display: "flex", alignItems: "center", gap: 8, fontSize: 11 }}>
-          <span style={{ color: "#fbbf24" }}>🛡️</span>
-          <span style={{ color: "#8a8898" }}>
-            <strong>Anti-Hardcoding Suite:</strong> 2 visible unit tests + {hiddenTestsCount} hidden edge-case test evaluated on submission.
-          </span>
+      {/* ── BENCH CONTROLS TOOLBAR ────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px", background: "#0c0d16", borderBottom: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", gap: 4 }}>
+          <button
+            onClick={() => setActiveTab("waveform")}
+            style={{
+              background: activeTab === "waveform" ? "#181a28" : "transparent",
+              border: "none",
+              borderBottom: activeTab === "waveform" ? "2px solid #fbbf24" : "2px solid transparent",
+              color: activeTab === "waveform" ? "#fbbf24" : "#8a8898",
+              fontSize: 11,
+              fontWeight: 700,
+              padding: "6px 12px",
+              cursor: "pointer",
+              fontFamily: "JetBrains Mono",
+            }}
+          >
+            📈 DSO &amp; Logic Analyzer
+          </button>
+          <button
+            onClick={() => setActiveTab("registers")}
+            style={{
+              background: activeTab === "registers" ? "#181a28" : "transparent",
+              border: "none",
+              borderBottom: activeTab === "registers" ? "2px solid #8b8eff" : "2px solid transparent",
+              color: activeTab === "registers" ? "#8b8eff" : "#8a8898",
+              fontSize: 11,
+              fontWeight: 700,
+              padding: "6px 12px",
+              cursor: "pointer",
+              fontFamily: "JetBrains Mono",
+            }}
+          >
+            🎛 Cortex-M Registers
+          </button>
         </div>
-      ) : null}
+
+        {/* Oscilloscope Interactive Dividers */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontFamily: "JetBrains Mono" }}>
+          {/* Timebase */}
+          <select
+            value={timebase}
+            onChange={(e) => setTimebase(e.target.value)}
+            style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.15)", color: "#fbbf24", padding: "3px 6px", borderRadius: 4, fontSize: 10, fontFamily: "inherit" }}
+          >
+            <option value="50µs/div">50µs/div</option>
+            <option value="100µs/div">100µs/div</option>
+            <option value="500µs/div">500µs/div</option>
+            <option value="1ms/div">1ms/div</option>
+            <option value="5ms/div">5ms/div</option>
+          </select>
+
+          {/* Volt/Div */}
+          <select
+            value={voltDiv}
+            onChange={(e) => setVoltDiv(e.target.value)}
+            style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.15)", color: "#38bdf8", padding: "3px 6px", borderRadius: 4, fontSize: 10, fontFamily: "inherit" }}
+          >
+            <option value="500mV/div">500mV/div</option>
+            <option value="1V/div">1V/div</option>
+            <option value="2V/div">2V/div</option>
+          </select>
+
+          {/* Action buttons */}
+          <button
+            onClick={() => setIsFrozen(!isFrozen)}
+            style={{
+              background: isFrozen ? "#fbbf24" : "rgba(255,255,255,0.06)",
+              color: isFrozen ? "#000" : "#e8e6f0",
+              border: "1px solid rgba(255,255,255,0.15)",
+              padding: "3px 8px",
+              borderRadius: 4,
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {isFrozen ? "▶ RUN" : "⏸ FREEZE"}
+          </button>
+
+          <button
+            onClick={handleInjectFault}
+            style={{
+              background: injectedGlitch ? "#f43f5e" : "rgba(244,63,94,0.1)",
+              color: injectedGlitch ? "#fff" : "#f43f5e",
+              border: "1px solid rgba(244,63,94,0.3)",
+              padding: "3px 8px",
+              borderRadius: 4,
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            ⚡ INJECT FAULT
+          </button>
+        </div>
+      </div>
+
+      {/* ── TAB CONTENT ──────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+        {activeTab === "waveform" && (
+          <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+            {/* HTML5 Canvas DSO */}
+            <div style={{ position: "relative", width: "100%", height: 160, background: "#070b0e" }}>
+              <canvas
+                ref={canvasRef}
+                width={540}
+                height={160}
+                style={{ width: "100%", height: "100%", display: "block" }}
+              />
+            </div>
+
+            {/* 8-Channel Logic Analyzer */}
+            {renderLogicAnalyzer()}
+          </div>
+        )}
+
+        {activeTab === "registers" && renderRegisters()}
+      </div>
     </div>
   );
 }

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { dynamo, TABLE } from "@/lib/dynamo";
-import { PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { SEEDED_COHORTS } from "@/lib/campus";
 
 export async function POST(req: Request) {
   try {
@@ -22,6 +23,53 @@ export async function POST(req: Request) {
     }
 
     const cleanCode = code.toUpperCase().trim();
+    const userId = ((session.user as any).id || (session.user as any).sub) as string;
+
+    // Verify course ownership
+    const cohortRes = await dynamo.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `COHORT#${cleanCode}`, SK: "METADATA" },
+      })
+    );
+
+    let cohortItem = cohortRes.Item;
+    if (!cohortItem) {
+      const seeded = SEEDED_COHORTS.find((c) => c.code === cleanCode);
+      if (seeded) {
+        cohortItem = {
+          PK: `COHORT#${cleanCode}`,
+          SK: "METADATA",
+          code: seeded.code,
+          title: seeded.title,
+          department: seeded.department,
+          institution: seeded.institution,
+          instructorId: userId,
+          instructorName: session.user.name || seeded.instructorName,
+          description: seeded.description,
+          createdAt: seeded.createdAt,
+          studentCount: seeded.studentCount,
+          assignmentsCount: seeded.assignmentsCount,
+        };
+        await dynamo.send(new PutCommand({ TableName: TABLE, Item: cohortItem }));
+      } else {
+        return NextResponse.json({ error: "Cohort not found." }, { status: 404 });
+      }
+    }
+
+    if (cohortItem.instructorId !== userId) {
+      // Check if user is at least verified faculty or admin
+      const profRes = await dynamo.send(
+        new GetCommand({ TableName: TABLE, Key: { PK: `USER#${userId}`, SK: "PROFILE" } })
+      );
+      const callerRole = profRes.Item?.role || (session.user as any).role;
+      if (callerRole !== "FACULTY" && callerRole !== "ADMIN") {
+        return NextResponse.json(
+          { error: "Forbidden: Only the verified course instructor or platform admin can create assignments for this cohort." },
+          { status: 403 }
+        );
+      }
+    }
     const assignmentId = `asg-${Date.now().toString(36)}`;
     const now = new Date().toISOString();
 

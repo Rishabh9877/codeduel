@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
-import { calcElo } from "@/lib/elo";
+import { calcElo, STARTING_ELO } from "@/lib/elo";
 
 /**
  * Public HTTP POST Gateway for Match Forfeits / Rage-Quits.
@@ -100,8 +100,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ status: "cancelled", match: finalizedMatch }, { status: 200 });
     }
 
-    const liveWinnerElo = winnerRes.Item?.elo ?? 1200;
-    const liveLoserElo = loserRes.Item?.elo ?? 1200;
+    const liveWinnerElo = winnerRes.Item?.elo ?? STARTING_ELO;
+    const liveLoserElo = loserRes.Item?.elo ?? STARTING_ELO;
 
     const newWinnerElo = calcElo(liveWinnerElo, liveLoserElo, true);
     const newLoserElo = calcElo(liveLoserElo, liveWinnerElo, false);

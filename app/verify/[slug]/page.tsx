@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   return {
-    title: `Credential Verification (${slug}) | CodeDuel`,
-    description: `Verify technical debugging credentials, anti-cheat logs, and ELO ratings on CodeDuel.`,
+    title: `Credential Verification (${slug}) | Codeduel`,
+    description: `Verify technical debugging credentials, anti-cheat logs, and ELO ratings on Codeduel.`,
   };
 }
 
@@ -86,7 +86,7 @@ export default async function VerifyCredentialPage({ params }: Props) {
               letterSpacing: -0.5,
             }}
           >
-            Code<span style={{ color: "#8b8eff" }}>Duel</span> Verification Authority
+            Codeduel Verification Authority
           </Link>
           <div style={{ fontSize: 11, color: "#6e6d7a", marginTop: 4 }}>
             Decentralized Engineering Skill &amp; Bug-Triage Verification
@@ -141,7 +141,7 @@ export default async function VerifyCredentialPage({ params }: Props) {
               {isVerified ? "✓ AUTHENTIC VERIFIED CREDENTIAL" : "✗ UNVERIFIED OR INVALID SLUG"}
             </span>
             <span style={{ fontSize: 10, color: "#6e6d7a" }}>
-              ISSUED BY CODEDUEL ENGINE
+              Issued by Codeduel Engine
             </span>
           </div>
 
@@ -179,7 +179,7 @@ export default async function VerifyCredentialPage({ params }: Props) {
                     {username}
                   </h2>
                   <div style={{ fontSize: 12, color: "#8a8898", marginTop: 2 }}>
-                    Verified Competitor · CodeDuel ID: {matchedProfile.userId}
+                    Verified Competitor · Codeduel ID: {matchedProfile.userId}
                   </div>
                 </div>
               </div>
@@ -316,7 +316,7 @@ export default async function VerifyCredentialPage({ params }: Props) {
         </div>
 
         <div style={{ textAlign: "center", marginTop: 24, fontSize: 11, color: "#4a4858" }}>
-          CodeDuel V2 · Technical Competency &amp; Incident Debugging Proof
+          Codeduel V2 · Technical Competency &amp; Incident Debugging Proof
         </div>
       </div>
     </div>

@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CodeDuel — Real-time Competitive Coding",
+  title: "Codeduel — Real-time Competitive Coding",
   description:
     "Race against another developer to solve the same problem. ELO-based matchmaking, live opponent status, AI hint coach.",
 };

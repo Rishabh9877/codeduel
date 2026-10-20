@@ -8,6 +8,7 @@ import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { getChallengeById, getRandomChallenge } from "@/lib/challenges";
 import { checkUserDuelQuota } from "@/lib/subscription";
+import { STARTING_ELO } from "@/lib/elo";
 import { v4 as uuidv4 } from "uuid";
 
 const MATCH_DURATION_MS = 15 * 60 * 1000;
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
       Key: { PK: `USER#${userId}`, SK: "PROFILE" },
     })
   );
-  const myElo: number = userItem.Item?.elo ?? 1200;
+  const myElo: number = userItem.Item?.elo ?? STARTING_ELO;
 
   // 3 — Guard: already in a live (non-expired) match?
   const activeMatchScan = await dynamo.send(
@@ -104,12 +105,12 @@ export async function POST(req: Request) {
   // 5 — Fallback to Mock Bot: if ?demo=true or queued >= 10 seconds
   if (forceDemo || waitDurationMs >= 10000) {
     const challenge = requestedChallengeId
-      ? getChallengeById(requestedChallengeId) ?? getRandomChallenge(requestedTrack)
-      : getRandomChallenge(requestedTrack);
+      ? getChallengeById(requestedChallengeId) ?? getRandomChallenge(requestedTrack, myElo, 'duo')
+      : getRandomChallenge(requestedTrack, myElo, 'duo');
 
     const matchId = uuidv4();
     const botId = "bot_sentinel_ai";
-    const botElo = Math.max(1050, myElo + Math.floor(Math.random() * 40 - 20));
+    const botElo = Math.max(600, myElo + Math.floor(Math.random() * 30 - 15));
 
     const botSlot = {
       userId: botId,
@@ -220,9 +221,10 @@ export async function POST(req: Request) {
 
     // Create Match
     const challengeTrack = requestedTrack || opponent.track || (Math.random() > 0.5 ? 'PRODUCTION_SWE' : 'EMBEDDED_SYSTEMS');
+    const avgElo = Math.round((myElo + Number(opponent.elo || 1000)) / 2);
     const challenge = requestedChallengeId
-      ? getChallengeById(requestedChallengeId) ?? getRandomChallenge(challengeTrack)
-      : getRandomChallenge(challengeTrack);
+      ? getChallengeById(requestedChallengeId) ?? getRandomChallenge(challengeTrack, avgElo, 'duo')
+      : getRandomChallenge(challengeTrack, avgElo, 'duo');
 
     const matchId = uuidv4();
     const matchItem = {

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { joinCohort } from "@/lib/campus";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { STARTING_ELO } from "@/lib/elo";
 
 export async function POST(req: Request) {
   try {
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
     }
 
     // Get user's current ELO from their profile if possible
-    let userElo = 1200;
+    let userElo = STARTING_ELO;
     try {
       const pRes = await dynamo.send(
         new GetCommand({ TableName: TABLE, Key: { PK: `USER#${userId}`, SK: "PROFILE" } })

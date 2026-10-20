@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
-import { calcElo } from "@/lib/elo";
+import { calcElo, STARTING_ELO } from "@/lib/elo";
 
 /**
  * Public HTTP POST Gateway for Match Lifecycle Timeouts.
@@ -75,8 +75,8 @@ export async function POST(req: Request) {
         dynamo.send(new GetCommand({ TableName: TABLE, Key: { PK: `USER#${loserId}`, SK: "PROFILE" } }))
       ]);
 
-      liveWinnerElo = winnerRes.Item?.elo ?? 1200;
-      liveLoserElo  = loserRes.Item?.elo ?? 1200;
+      liveWinnerElo = winnerRes.Item?.elo ?? STARTING_ELO;
+      liveLoserElo  = loserRes.Item?.elo ?? STARTING_ELO;
 
       newWinnerElo = calcElo(liveWinnerElo, liveLoserElo, true);
       newLoserElo  = calcElo(liveLoserElo, liveWinnerElo, false);

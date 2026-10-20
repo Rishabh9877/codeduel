@@ -2,7 +2,7 @@
 // SEED CHALLENGES — Production Bug-Fixing Battleground
 // =============================================================================
 //
-// CodeDuel has pivoted away from textbook DSA puzzles (Two Sum, Tree Inversions).
+// Codeduel has pivoted away from textbook DSA puzzles (Two Sum, Tree Inversions).
 // Instead, developers race to resolve REAL-WORLD production tickets across two
 // distinct engineering tracks:
 //
@@ -70,6 +70,8 @@ export interface Challenge {
   walkthrough: ChallengeWalkthrough;
   hardwareContext?: HardwareContext;
   hiddenTestsCount?: number;
+  canonicalSolution?: string;
+  category?: 'solo' | 'duo' | 'both';
 }
 
 export const SEED_CHALLENGES: Record<string, Challenge> = {
@@ -77,9 +79,101 @@ export const SEED_CHALLENGES: Record<string, Challenge> = {
   // TRACK: PRODUCTION_SWE — TypeScript / Node.js Microservice Bugs
   // ═══════════════════════════════════════════════════════════════════════════
 
+  'swe-url-query-sanitizer': {
+    difficulty: 'easy',
+    estimatedMinutes: 8,
+    category: 'duo',
+    skills: ["URL Encoding", "Web Security", "Input Sanitization", "API Gateway"],
+    walkthrough: {
+      "rootCause": "In sanitize.ts, query parameters were concatenated directly into the redirect URL without URI encoding. Special characters such as '&', '=', and spaces caused parameter injection and invalid redirect targets.",
+      "buggyVsFixedDiff": "- const query = params.map(p => `${p.key}=${p.value}`).join('&');\n+ const query = params.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');",
+      "whyItMatters": "Unescaped parameter reflection allows attackers to inject arbitrary parameters into downstream OAuth callbacks or cloud edge proxies.",
+      "commonMistakes": [
+        "Using encodeURI instead of encodeURIComponent for individual key/value pairs",
+        "Forgetting to encode keys as well as values"
+      ]
+    },
+    id: 'swe-url-query-sanitizer',
+    track: 'PRODUCTION_SWE',
+    language: 'typescript',
+    title: 'SEC #104: Prevent Query Param Splitting in Edge Redirect Gateway',
+    repoContext: 'cloud-edge/redirect-gateway',
+    ticketMarkdown: `### 🚨 Security Incident: Query Parameter Splitting & Injection
+High-priority triage ticket from API Gateway Security.
+Unescaped special characters in redirect parameters bypass ingress validation.
+
+**Root Cause:** In \`sanitize.ts\`, query parameters are formatted via raw string template interpolation without \`encodeURIComponent\`. Values containing \`&\` or \`=\` split downstream parameters.
+
+**Fix Required:** Properly encode both query parameter keys and values using \`encodeURIComponent\`.`,
+    entrypoint: 'runner.ts',
+    totalTests: 3,
+    files: [
+      {
+        name: 'types.ts',
+        readOnly: true,
+        content: `export interface QueryParam {
+  key: string;
+  value: string;
+}`
+      },
+      {
+        name: 'sanitize.ts',
+        readOnly: false,
+        content: `import { QueryParam } from './types';
+
+export function buildRedirectUrl(baseUrl: string, params: QueryParam[]): string {
+  if (!params.length) return baseUrl;
+  // BUG: Direct string interpolation without encodeURIComponent
+  const query = params.map(p => \`\${p.key}=\${p.value}\`).join('&');
+  return \`\${baseUrl}?\${query}\`;
+}`
+      },
+      {
+        name: 'runner.ts',
+        readOnly: true,
+        content: `import { buildRedirectUrl } from './sanitize';
+
+let passed = 0;
+const total = 3;
+
+// Test 1: Standard query params
+const t1 = buildRedirectUrl("https://auth.codeduel.io/cb", [{ key: "state", value: "xyz" }]);
+if (t1 === "https://auth.codeduel.io/cb?state=xyz") {
+  console.log("[PASS] TEST_1: Standard query params encoded");
+  passed++;
+} else {
+  console.log("[FAIL] TEST_1: Expected https://auth.codeduel.io/cb?state=xyz, got " + t1);
+}
+
+// Test 2: Spaces and special characters
+const t2 = buildRedirectUrl("https://auth.codeduel.io/cb", [{ key: "name", value: "John Doe & Co" }]);
+if (t2.includes("John%20Doe%20%26%20Co")) {
+  console.log("[PASS] TEST_2: Reserved symbols properly percent-encoded");
+  passed++;
+} else {
+  console.log("[FAIL] TEST_2: Failed to percent encode spaces or ampersands: " + t2);
+}
+
+// Test 3: Parameter injection prevention with '=' and '&'
+const t3 = buildRedirectUrl("https://auth.codeduel.io/cb", [{ key: "role", value: "guest&admin=true" }]);
+if (!t3.includes("&admin=true") && t3.includes("guest%26admin%3Dtrue")) {
+  console.log("[PASS] TEST_3: Injected delimiters are safely encoded");
+  passed++;
+} else {
+  console.log("[FAIL] TEST_3: Parameter splitting vulnerability exposed: " + t3);
+}
+
+console.log(\`SUMMARY: \${passed}/\${total} PASSED\`);
+process.exit(passed === total ? 0 : 1);
+`
+      }
+    ]
+  },
+
   'swe-token-bucket': {
     difficulty: 'medium',
     estimatedMinutes: 15,
+    category: 'duo',
     skills: ["Rate Limiting","Token Bucket","Time Truncation","Concurrency"],
     walkthrough: {
       "rootCause": "In rateLimiter.ts, elapsed time is computed as Math.floor((now - lastRefillMs) / 1000). For any sub-second intervals (< 1000ms), this integer truncation evaluates to 0, completely preventing token replenishment during high-frequency microsecond/millisecond bursts.",
@@ -1929,10 +2023,45 @@ export function getChallengeById(id: string): Challenge | undefined {
   return SEED_CHALLENGES[id];
 }
 
-/** Get a random challenge, optionally filtered by track. */
-export function getRandomChallenge(track?: 'PRODUCTION_SWE' | 'EMBEDDED_SYSTEMS'): Challenge {
+/** Get a random challenge, optionally filtered by track, player ELO rating, and mode ('solo' | 'duo'). */
+export function getRandomChallenge(
+  track?: 'PRODUCTION_SWE' | 'EMBEDDED_SYSTEMS',
+  elo?: number,
+  mode?: 'solo' | 'duo'
+): Challenge {
   const all = Object.values(SEED_CHALLENGES);
-  const pool = track ? all.filter((c) => c.track === track) : all;
+
+  // 1. Filter by mode (solo practice vs duo firefighting)
+  let pool = all;
+  if (mode === 'solo') {
+    pool = pool.filter((c) => c.category === 'solo' || c.category === 'both' || !c.category);
+  } else if (mode === 'duo') {
+    pool = pool.filter((c) => c.category === 'duo' || c.category === 'both' || !c.category);
+  }
+
+  // 2. Filter by track
+  if (track) {
+    const trackPool = pool.filter((c) => c.track === track);
+    if (trackPool.length > 0) pool = trackPool;
+  }
+
+  // 3. Match difficulty based on player ELO bracket
+  if (typeof elo === 'number') {
+    let targetDifficulty: 'easy' | 'medium' | 'hard';
+    if (elo < 1100) {
+      targetDifficulty = 'easy';
+    } else if (elo < 1400) {
+      targetDifficulty = 'medium';
+    } else {
+      targetDifficulty = 'hard';
+    }
+
+    const diffPool = pool.filter((c) => c.difficulty === targetDifficulty);
+    if (diffPool.length > 0) {
+      return diffPool[Math.floor(Math.random() * diffPool.length)];
+    }
+  }
+
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -1941,9 +2070,17 @@ export function getAllChallengeIds(): string[] {
   return Object.keys(SEED_CHALLENGES);
 }
 
-/** Get all challenges as an array, optionally filtered by track. */
-export function getAllChallenges(track?: 'PRODUCTION_SWE' | 'EMBEDDED_SYSTEMS'): Challenge[] {
-  const all = Object.values(SEED_CHALLENGES);
+/** Get all challenges as an array, optionally filtered by track and mode. */
+export function getAllChallenges(
+  track?: 'PRODUCTION_SWE' | 'EMBEDDED_SYSTEMS',
+  mode?: 'solo' | 'duo'
+): Challenge[] {
+  let all = Object.values(SEED_CHALLENGES);
+  if (mode === 'solo') {
+    all = all.filter((c) => c.category === 'solo' || c.category === 'both' || !c.category);
+  } else if (mode === 'duo') {
+    all = all.filter((c) => c.category === 'duo' || c.category === 'both' || !c.category);
+  }
   return track ? all.filter((c) => c.track === track) : all;
 }
 

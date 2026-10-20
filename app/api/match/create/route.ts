@@ -8,6 +8,7 @@ import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { getChallengeById, getRandomChallenge } from "@/lib/challenges";
 import type { Challenge } from "@/lib/challenges";
+import { STARTING_ELO } from "@/lib/elo";
 import { v4 as uuidv4 } from "uuid";
 
 const MATCH_DURATION_MS = 15 * 60 * 1000;
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
       Key: { PK: `USER#${userId}`, SK: "PROFILE" },
     })
   );
-  const myElo: number = userItem.Item?.elo ?? 1200;
+  const myElo: number = userItem.Item?.elo ?? STARTING_ELO;
 
   // 3 — Guard: already in a live (non-expired) match?
   const activeMatchScan = await dynamo.send(
@@ -81,12 +82,12 @@ export async function POST(req: Request) {
   // Fallback to Mock Bot: if ?demo=true or queued >= 10 seconds
   if (isDemo || waitDurationMs >= 10000) {
     const challenge = requestedChallengeId
-      ? getChallengeById(requestedChallengeId) ?? getRandomChallenge(requestedTrack)
-      : getRandomChallenge(requestedTrack);
+      ? getChallengeById(requestedChallengeId) ?? getRandomChallenge(requestedTrack, myElo, 'duo')
+      : getRandomChallenge(requestedTrack, myElo, 'duo');
 
     const matchId = uuidv4();
     const botId = "bot_sentinel_ai";
-    const botElo = Math.max(1050, myElo + 25);
+    const botElo = Math.max(600, myElo + Math.floor(Math.random() * 30 - 15));
     const ttl = Math.floor(nowMs / 1000) + 7200;
 
     await dynamo.send(
@@ -169,7 +170,7 @@ export async function POST(req: Request) {
       const trackMatch = !requestedTrack || !item.requestedTrack ||
         item.requestedTrack === requestedTrack;
 
-      return Math.abs((item.elo ?? 1200) - myElo) <= allowedDiff && trackMatch;
+      return Math.abs((item.elo ?? STARTING_ELO) - myElo) <= allowedDiff && trackMatch;
     }
   );
 
@@ -199,12 +200,13 @@ export async function POST(req: Request) {
       // Resolve challenge: prefer explicit ID, then track preference, then fully random
       const finalChallengeId = requestedChallengeId || opponent.requestedChallengeId;
       const finalTrack = requestedTrack || opponent.requestedTrack;
+      const avgElo = Math.round((myElo + Number(opponent.elo || 1000)) / 2);
 
       let challenge: Challenge;
       if (finalChallengeId) {
-        challenge = getChallengeById(finalChallengeId) ?? getRandomChallenge(finalTrack);
+        challenge = getChallengeById(finalChallengeId) ?? getRandomChallenge(finalTrack, avgElo, 'duo');
       } else {
-        challenge = getRandomChallenge(finalTrack);
+        challenge = getRandomChallenge(finalTrack, avgElo, 'duo');
       }
 
       const now = Date.now();
@@ -236,7 +238,7 @@ export async function POST(req: Request) {
             player2: {
               userId: opponent.userId,
               username: opponent.username,
-              elo: opponent.elo ?? 1200,
+              elo: opponent.elo ?? STARTING_ELO,
               hintsUsed: 0,
               submitted: false,
               passed: false,

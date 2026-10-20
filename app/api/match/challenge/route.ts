@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { PutCommand, QueryCommand, DeleteCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { getChallengeById, getRandomChallenge } from "@/lib/challenges";
+import { STARTING_ELO } from "@/lib/elo";
 import { v4 as uuidv4 } from "uuid";
 
 // Send a challenge or Accept a challenge
@@ -74,14 +75,14 @@ export async function POST(req: Request) {
 
       const matchId = uuidv4();
       
-      // Resolve challenge
       const requestedChallengeId = deletedChallenge?.challengeId;
       const requestedTrack = deletedChallenge?.track;
+      const avgElo = Math.round((Number(myProfile.Item?.elo || 1000) + Number(challengerProfile.Item?.elo || 1000)) / 2);
       let challenge;
       if (requestedChallengeId) {
-        challenge = getChallengeById(requestedChallengeId) ?? getRandomChallenge(requestedTrack);
+        challenge = getChallengeById(requestedChallengeId) ?? getRandomChallenge(requestedTrack, avgElo, 'duo');
       } else {
-        challenge = getRandomChallenge(requestedTrack);
+        challenge = getRandomChallenge(requestedTrack, avgElo, 'duo');
       }
 
       await dynamo.send(
@@ -101,7 +102,7 @@ export async function POST(req: Request) {
               userId: challengerId,
               username: challengerProfile.Item?.username ?? "Player 1",
               avatar: challengerProfile.Item?.avatar ?? null,
-              elo: challengerProfile.Item?.elo ?? 1200,
+              elo: challengerProfile.Item?.elo ?? STARTING_ELO,
               hintsUsed: 0,
               submitted: false,
               passed: false,
@@ -111,7 +112,7 @@ export async function POST(req: Request) {
               userId: userId,
               username: username,
               avatar: avatar,
-              elo: myProfile.Item?.elo ?? 1200,
+              elo: myProfile.Item?.elo ?? STARTING_ELO,
               hintsUsed: 0,
               submitted: false,
               passed: false,

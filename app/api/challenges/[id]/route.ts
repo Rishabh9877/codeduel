@@ -13,8 +13,8 @@ export async function GET(
       return NextResponse.json({ error: "Challenge not found" }, { status: 404 });
     }
 
-    // Return challenge definition with files, excluding walkthrough upfront
-    const { walkthrough, ...safeChallenge } = challenge;
+    // Return challenge definition with files, excluding walkthrough and canonical solution
+    const { walkthrough, canonicalSolution, ...safeChallenge } = challenge;
 
     return NextResponse.json({ challenge: safeChallenge });
   } catch (err: any) {

@@ -45,7 +45,30 @@ export interface ChallengeExecutionResult {
   testResults: Array<{ name: string; passed: boolean }>;
 }
 
-// ── Built-In In-Memory TypeScript Runner ──────────────────────────────────────
+// ── Secure Isolated Subprocess Runners ────────────────────────────────────────
+
+function writeSafeFile(baseDir: string, rawFilename: string, content: string): string {
+  const safeBase = path.basename(rawFilename);
+  const targetPath = path.resolve(baseDir, safeBase);
+  if (!targetPath.startsWith(path.resolve(baseDir))) {
+    throw new Error("Invalid file name: directory traversal blocked");
+  }
+  fs.writeFileSync(targetPath, content, "utf-8");
+  return targetPath;
+}
+
+function getSafeSubprocessEnv(tmpDir: string): NodeJS.ProcessEnv {
+  return {
+    PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
+    SYSTEMROOT: process.env.SYSTEMROOT || "",
+    TMPDIR: tmpDir,
+    TEMP: tmpDir,
+    TMP: tmpDir,
+    NODE_ENV: "production",
+    PYTHONUNBUFFERED: "1",
+    PYTHONDONTWRITEBYTECODE: "1",
+  };
+}
 
 async function executeTypeScriptLocally(
   mergedFiles: { name: string; content: string }[],
@@ -53,93 +76,33 @@ async function executeTypeScriptLocally(
   expectedTotal: number
 ): Promise<ChallengeExecutionResult> {
   const start = Date.now();
-  const stdoutLines: string[] = [];
-  const stderrLines: string[] = [];
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeduel-ts-"));
 
   try {
-    const modules: Record<string, any> = {};
-
-    // Custom console to capture test runner outputs
-    const capturedConsole = {
-      log: (...args: any[]) => {
-        stdoutLines.push(args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "));
-      },
-      error: (...args: any[]) => {
-        stderrLines.push(args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "));
-      },
-      warn: (...args: any[]) => {
-        stdoutLines.push(args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "));
-      },
-      info: (...args: any[]) => {
-        stdoutLines.push(args.map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a))).join(" "));
-      },
-    };
-
-    const requireShim = (specifier: string) => {
-      const clean = specifier.replace(/^\.\//, "").replace(/\.(ts|js)$/, "");
-      if (modules[clean]) return modules[clean];
-      const match = mergedFiles.find((f) => f.name.replace(/\.(ts|js)$/, "") === clean);
-      if (match) {
-        runFile(match.name, match.content);
-        return modules[clean];
-      }
-      return {};
-    };
-
-    async function runFile(filename: string, source: string) {
-      const baseName = filename.replace(/\.(ts|js)$/, "");
-      if (modules[baseName]) return;
-
-      const js = ts.transpileModule(source, {
-        compilerOptions: {
-          module: ts.ModuleKind.CommonJS,
-          target: ts.ScriptTarget.ES2022,
-        },
-      }).outputText;
-
-      const moduleObj = { exports: {} };
-      modules[baseName] = moduleObj.exports;
-
-      const context = vm.createContext({
-        console: capturedConsole,
-        module: moduleObj,
-        exports: moduleObj.exports,
-        require: requireShim,
-        Buffer,
-        Date,
-        Math,
-        setTimeout,
-        clearTimeout,
-        URL,
-        URLSearchParams,
-        TextEncoder,
-        TextDecoder,
-        process: { exit: () => {} },
-      });
-
-      const res = vm.runInContext(js, context, { timeout: 4000 });
-      if (res && typeof res.then === "function") {
-        await res;
-      }
-      modules[baseName] = moduleObj.exports;
+    const entryBase = path.basename(entrypoint).replace(/\.ts$/, ".js");
+    for (const f of mergedFiles) {
+      const isTs = f.name.endsWith(".ts");
+      const jsContent = isTs
+        ? ts.transpileModule(f.content, {
+            compilerOptions: {
+              module: ts.ModuleKind.CommonJS,
+              target: ts.ScriptTarget.ES2022,
+            },
+          }).outputText
+        : f.content;
+      const targetName = isTs ? f.name.replace(/\.ts$/, ".js") : f.name;
+      writeSafeFile(tmpDir, targetName, jsContent);
     }
 
-    // Execute dependencies first, then entrypoint
-    const nonEntry = mergedFiles.filter((f) => f.name !== entrypoint);
-    for (const f of nonEntry) {
-      await runFile(f.name, f.content);
-    }
+    const safeEnv = getSafeSubprocessEnv(tmpDir);
+    const nodeBin = process.execPath || "node";
 
-    const entry = mergedFiles.find((f) => f.name === entrypoint);
-    if (entry) {
-      await runFile(entry.name, entry.content);
-    }
+    const { stdout, stderr } = await execFileAsync(nodeBin, [entryBase], {
+      cwd: tmpDir,
+      timeout: 5000,
+      env: safeEnv,
+    });
 
-    // Allow any pending microtasks/promises to flush
-    await new Promise((resolve) => setTimeout(resolve, 80));
-
-    const stdout = stdoutLines.join("\n");
-    const stderr = stderrLines.join("\n");
     const runtimeMs = Date.now() - start;
     const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
 
@@ -153,85 +116,9 @@ async function executeTypeScriptLocally(
       status: passed === total && total > 0 ? "accepted" : (stderr ? "runtime_error" : "wrong_answer"),
       testResults,
     };
-  } catch (err: any) {
-    const runtimeMs = Date.now() - start;
-    return {
-      passed: 0,
-      total: expectedTotal,
-      allPassed: false,
-      stdout: stdoutLines.join("\n"),
-      stderr: err.message ?? "Runtime evaluation exception",
-      runtimeMs,
-      status: "runtime_error",
-      testResults: [],
-    };
-  }
-}
-
-// ── Built-In C Runner (using local clang / gcc) ────────────────────────────────
-
-async function executeCLocally(
-  mergedFiles: { name: string; content: string }[],
-  entrypoint: string,
-  expectedTotal: number
-): Promise<ChallengeExecutionResult> {
-  const start = Date.now();
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeduel-c-"));
-
-  try {
-    for (const f of mergedFiles) {
-      fs.writeFileSync(path.join(tmpDir, f.name), f.content, "utf-8");
-    }
-
-    // Single-pass vs multi-translation unit detection:
-    // If entrypoint #includes other .c files, compile only entrypoint to prevent duplicate symbols.
-    const entrypointSource = mergedFiles.find((f) => f.name === entrypoint)?.content ?? "";
-    const cFilesToCompile = [entrypoint];
-    for (const f of mergedFiles) {
-      if (f.name.endsWith(".c") && f.name !== entrypoint) {
-        if (!entrypointSource.includes(f.name)) {
-          cFilesToCompile.push(f.name);
-        }
-      }
-    }
-
-    const binPath = path.join(tmpDir, "challenge_bin");
-    const compiler = process.platform === "win32" ? "gcc" : "clang";
-
-    // Compile
-    try {
-      await execFileAsync(compiler, ["-O2", ...cFilesToCompile, "-o", binPath], { cwd: tmpDir, timeout: 8000 });
-    } catch (compileErr: any) {
-      return {
-        passed: 0,
-        total: expectedTotal,
-        allPassed: false,
-        stdout: "",
-        stderr: compileErr.stderr || compileErr.message,
-        runtimeMs: Date.now() - start,
-        status: "compile_error",
-        testResults: [],
-      };
-    }
-
-    // Run
-    const { stdout, stderr } = await execFileAsync(binPath, [], { cwd: tmpDir, timeout: 5000 });
-    const runtimeMs = Date.now() - start;
-    const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
-
-    return {
-      passed,
-      total,
-      allPassed: passed === total && total > 0,
-      stdout,
-      stderr,
-      runtimeMs,
-      status: passed === total && total > 0 ? "accepted" : "wrong_answer",
-      testResults,
-    };
   } catch (runErr: any) {
     const stdout = runErr.stdout ?? "";
-    const stderr = (runErr.stderr || "").trim();
+    const stderr = (runErr.stderr || runErr.message || "").trim();
     const runtimeMs = Date.now() - start;
     const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
 
@@ -253,7 +140,112 @@ async function executeCLocally(
       total: expectedTotal,
       allPassed: false,
       stdout,
+      stderr: runErr.killed ? "Execution timed out (5s limit exceeded)" : stderr,
+      runtimeMs,
+      status: runErr.killed ? "timeout" : "runtime_error",
+      testResults: [],
+    };
+  } finally {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch (_) {}
+  }
+}
+
+// ── Built-In C Runner (using local clang / gcc) ────────────────────────────────
+
+async function executeCLocally(
+  mergedFiles: { name: string; content: string }[],
+  entrypoint: string,
+  expectedTotal: number
+): Promise<ChallengeExecutionResult> {
+  const start = Date.now();
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "codeduel-c-"));
+
+  try {
+    for (const f of mergedFiles) {
+      writeSafeFile(tmpDir, f.name, f.content);
+    }
+
+    const safeEnv = getSafeSubprocessEnv(tmpDir);
+
+    const entrypointSource = mergedFiles.find((f) => f.name === entrypoint)?.content ?? "";
+    const cFilesToCompile = [path.basename(entrypoint)];
+    for (const f of mergedFiles) {
+      if (f.name.endsWith(".c") && f.name !== entrypoint) {
+        if (!entrypointSource.includes(f.name)) {
+          cFilesToCompile.push(path.basename(f.name));
+        }
+      }
+    }
+
+    const binPath = path.join(tmpDir, "challenge_bin");
+    const compiler = process.platform === "win32" ? "gcc" : "clang";
+
+    // Compile with isolated environment
+    try {
+      await execFileAsync(compiler, ["-O2", ...cFilesToCompile, "-o", binPath], {
+        cwd: tmpDir,
+        timeout: 8000,
+        env: safeEnv,
+      });
+    } catch (compileErr: any) {
+      return {
+        passed: 0,
+        total: expectedTotal,
+        allPassed: false,
+        stdout: "",
+        stderr: compileErr.stderr || compileErr.message,
+        runtimeMs: Date.now() - start,
+        status: "compile_error",
+        testResults: [],
+      };
+    }
+
+    // Run with isolated environment
+    const { stdout, stderr } = await execFileAsync(binPath, [], {
+      cwd: tmpDir,
+      timeout: 5000,
+      env: safeEnv,
+    });
+    const runtimeMs = Date.now() - start;
+    const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
+
+    return {
+      passed,
+      total,
+      allPassed: passed === total && total > 0,
+      stdout,
       stderr,
+      runtimeMs,
+      status: passed === total && total > 0 ? "accepted" : "wrong_answer",
+      testResults,
+    };
+  } catch (runErr: any) {
+    const stdout = runErr.stdout ?? "";
+    const stderr = (runErr.stderr || runErr.message || "").trim();
+    const runtimeMs = Date.now() - start;
+    const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
+
+    if (stdout.includes("SUMMARY:") || testResults.length > 0) {
+      return {
+        passed,
+        total,
+        allPassed: false,
+        stdout,
+        stderr: stderr || "",
+        runtimeMs,
+        status: "wrong_answer",
+        testResults,
+      };
+    }
+
+    return {
+      passed: 0,
+      total: expectedTotal,
+      allPassed: false,
+      stdout,
+      stderr: runErr.killed ? "Execution timed out (5s limit exceeded)" : stderr,
       runtimeMs,
       status: runErr.killed ? "timeout" : "runtime_error",
       testResults: [],
@@ -277,14 +269,15 @@ async function executePythonLocally(
 
   try {
     for (const f of mergedFiles) {
-      fs.writeFileSync(path.join(tmpDir, f.name), f.content, "utf-8");
+      writeSafeFile(tmpDir, f.name, f.content);
     }
 
+    const safeEnv = getSafeSubprocessEnv(tmpDir);
     const pythonCmd = process.env.PYTHON_PATH || (process.platform === "win32" ? "python" : "python3");
-    const { stdout, stderr } = await execFileAsync(pythonCmd, [entrypoint], {
+    const { stdout, stderr } = await execFileAsync(pythonCmd, [path.basename(entrypoint)], {
       cwd: tmpDir,
       timeout: 5000,
-      env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONDONTWRITEBYTECODE: "1" },
+      env: safeEnv,
     });
     const runtimeMs = Date.now() - start;
     const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
@@ -301,7 +294,7 @@ async function executePythonLocally(
     };
   } catch (runErr: any) {
     const stdout = runErr.stdout ?? "";
-    const stderr = (runErr.stderr || "").trim();
+    const stderr = (runErr.stderr || runErr.message || "").trim();
     const runtimeMs = Date.now() - start;
     const { passed, total, testResults } = parseTestOutput(stdout, expectedTotal);
 
@@ -323,7 +316,7 @@ async function executePythonLocally(
       total: expectedTotal,
       allPassed: false,
       stdout,
-      stderr,
+      stderr: runErr.killed ? "Execution timed out (5s limit exceeded)" : stderr,
       runtimeMs,
       status: runErr.killed ? "timeout" : "runtime_error",
       testResults: [],

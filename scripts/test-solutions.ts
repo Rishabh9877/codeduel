@@ -1,8 +1,17 @@
 import { SEED_CHALLENGES } from '../lib/challenges';
 import { executeChallenge } from '../lib/challengeExecutor';
 
-// Known solutions for all 10 challenges
+// Known solutions for all challenges
 const SOLUTIONS: Record<string, Record<string, string>> = {
+  'swe-url-query-sanitizer': {
+    'sanitize.ts': `import { QueryParam } from './types';
+
+export function buildRedirectUrl(baseUrl: string, params: QueryParam[]): string {
+  if (!params.length) return baseUrl;
+  const query = params.map(p => \`\${encodeURIComponent(p.key)}=\${encodeURIComponent(p.value)}\`).join('&');
+  return \`\${baseUrl}?\${query}\`;
+}`
+  },
   'swe-token-bucket': {
     'rateLimiter.ts': `import { BucketConfig, BucketState } from './types';
 

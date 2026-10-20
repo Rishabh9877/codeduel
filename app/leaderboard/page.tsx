@@ -4,6 +4,8 @@ import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import RoleBadgeSwitcher from "@/components/RoleBadgeSwitcher";
+import AppNavbar from "@/components/AppNavbar";
 
 interface LeaderboardEntry {
   rank: number;
@@ -45,12 +47,12 @@ export default function LeaderboardPage() {
   };
 
   const eloTier = (elo: number) => {
-    if (elo >= 2000) return { label: "Grandmaster", color: "#f43f5e" };
-    if (elo >= 1800) return { label: "Master",      color: "#a855f7" };
-    if (elo >= 1600) return { label: "Diamond",     color: "#38bdf8" };
-    if (elo >= 1400) return { label: "Gold",        color: "#fbbf24" };
-    if (elo >= 1200) return { label: "Silver",      color: "#94a3b8" };
-    return             { label: "Bronze",            color: "#cd7f32" };
+    if (elo >= 1800) return { label: "Master",      color: "#f43f5e" };
+    if (elo >= 1600) return { label: "Diamond",     color: "#a855f7" };
+    if (elo >= 1400) return { label: "Platinum",    color: "#38bdf8" };
+    if (elo >= 1200) return { label: "Gold",        color: "#fbbf24" };
+    if (elo >= 1000) return { label: "Silver",      color: "#94a3b8" };
+    return             { label: "Bronze",      color: "#cd7f32" };
   };
 
   const displayedEntries = entries.filter((e) =>
@@ -340,43 +342,7 @@ export default function LeaderboardPage() {
       `}</style>
 
       {/* NAV */}
-      <nav className="lb-nav">
-        <Link href="/" className="lb-brand">CodeDuel</Link>
-        <div className="lb-nav-links">
-          {status === "authenticated" ? (
-            <>
-              <Link href="/dashboard" className="lb-nav-link">Dashboard</Link>
-              <Link href="/practice" className="lb-nav-link">Solo</Link>
-              <Link href="/leaderboard" className="lb-nav-link active">Leaderboard</Link>
-              <Link href="/campus" className="lb-nav-link">Campus</Link>
-              <Link href="/friends" className="lb-nav-link">Friends</Link>
-              <Link href="/profile" className="lb-nav-link">Profile</Link>
-            </>
-          ) : (
-            <>
-              <Link href="/#elo" className="lb-nav-link">Rank System</Link>
-              <Link href="/#live" className="lb-nav-link">Live Feed</Link>
-              <Link href="/#social" className="lb-nav-link">Social Play</Link>
-              <Link href="/#community" className="lb-nav-link">Community</Link>
-              <Link href="/leaderboard" className="lb-nav-link active">Leaderboard</Link>
-            </>
-          )}
-        </div>
-        <div style={{ width: 140, display: "flex", justifyContent: "flex-end" }}>
-          {status === "unauthenticated" && (
-            <button 
-              onClick={() => signIn("github")}
-              className="lb-nav-link" 
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, border: "1px solid var(--border2)", fontWeight: 600, background: "var(--text)", color: "#000", cursor: "pointer" }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-              </svg>
-              Sign In
-            </button>
-          )}
-        </div>
-      </nav>
+      <AppNavbar activePage="leaderboard" />
 
       <main className="lb-main">
 
@@ -523,12 +489,12 @@ export default function LeaderboardPage() {
         {/* Tier legend */}
         <div className="tier-row">
           {[
-            { label: "Grandmaster", color: "#f43f5e", min: "2000+" },
-            { label: "Master",      color: "#a855f7", min: "1800"  },
-            { label: "Diamond",     color: "#38bdf8", min: "1600"  },
-            { label: "Gold",        color: "#fbbf24", min: "1400"  },
-            { label: "Silver",      color: "#94a3b8", min: "1200"  },
-            { label: "Bronze",      color: "#cd7f32", min: "<1200" },
+            { label: "Master",      color: "#f43f5e", min: "1800+" },
+            { label: "Diamond",     color: "#a855f7", min: "1600"  },
+            { label: "Platinum",    color: "#38bdf8", min: "1400"  },
+            { label: "Gold",        color: "#fbbf24", min: "1200"  },
+            { label: "Silver",      color: "#94a3b8", min: "1000"  },
+            { label: "Bronze",      color: "#cd7f32", min: "<1000" },
           ].map((t) => (
             <div key={t.label} className="tier-chip">
               <span className="tier-dot" style={{ background: t.color }} />
@@ -644,7 +610,7 @@ export default function LeaderboardPage() {
         {/* LEADERBOARD FOOTER */}
         <div style={{ marginTop: 64, paddingTop: 28, borderTop: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16, fontSize: 12, color: "#6e6d7a" }}>
           <div>
-            CodeDuel Global Competitive Engineering Leaderboard · Punjab Engineering College (PEC)
+            Codeduel Global Competitive Engineering Leaderboard · Real-Time Skill Verification
           </div>
           <div style={{ display: "flex", gap: 20 }}>
             <Link href="/about" style={{ color: "#8a8898", textDecoration: "none" }}>About</Link>

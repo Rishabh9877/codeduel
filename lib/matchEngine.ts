@@ -1,6 +1,6 @@
 import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamo, TABLE } from "./dynamo";
-import { calcElo } from "./elo";
+import { calcElo, STARTING_ELO } from "./elo";
 
 /**
  * Core backend orchestrator to handle match finalization.
@@ -27,9 +27,9 @@ export async function processMatchEnd(winnerId: string, loserId: string) {
       }))
     ]);
 
-    // Extract current ELO values, defaulting to 1200 if it's a brand new profile
-    const winnerOldElo = winnerRes.Item?.elo ?? 1200;
-    const loserOldElo = loserRes.Item?.elo ?? 1200;
+    // Extract current ELO values, defaulting to STARTING_ELO if it's a brand new profile
+    const winnerOldElo = winnerRes.Item?.elo ?? STARTING_ELO;
+    const loserOldElo = loserRes.Item?.elo ?? STARTING_ELO;
 
    
     // STEP 2: Run ELO Logic

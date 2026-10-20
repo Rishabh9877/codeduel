@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { GetCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { STARTING_ELO } from "@/lib/elo";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export async function GET() {
     );
 
     const profile = profileRes.Item;
-    const currentElo = Number(profile?.elo ?? 1200);
+    const currentElo = Number(profile?.elo ?? STARTING_ELO);
 
     // 2. Fetch recent matches for this user
     const matchesScan = await dynamo.send(
@@ -61,21 +62,21 @@ export async function GET() {
 
     // 3. ELO History
     const eloHistory: Array<{ played_at: string; elo: number }> = [
-      { played_at: new Date(profile?.createdAt ?? Date.now() - 86400000).toISOString(), elo: 1200 },
+      { played_at: new Date(profile?.createdAt ?? Date.now() - 86400000).toISOString(), elo: STARTING_ELO },
     ];
-    let rollingElo = 1200;
+    let rollingElo = STARTING_ELO;
     const chronological = [...userMatches].reverse();
     for (const m of chronological) {
       const isWin = m.winnerId === userId;
       rollingElo = isWin
         ? Number(m.newWinnerElo ?? (rollingElo + 16))
-        : Number(m.newLoserElo ?? Math.max(800, rollingElo - 16));
+        : Number(m.newLoserElo ?? Math.max(600, rollingElo - 16));
       eloHistory.push({
         played_at: new Date(m.finishedAt ?? m.startedAt ?? Date.now()).toISOString(),
         elo: rollingElo,
       });
     }
-    if (eloHistory.length === 1 && currentElo !== 1200) {
+    if (eloHistory.length === 1 && currentElo !== STARTING_ELO) {
       eloHistory.push({
         played_at: new Date().toISOString(),
         elo: currentElo,
