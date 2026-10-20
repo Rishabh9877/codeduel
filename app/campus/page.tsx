@@ -100,6 +100,7 @@ export default function CampusPage() {
 
   // Form states
   const [joinCodeInput, setJoinCodeInput] = useState("");
+  const [selectedJoinCodes, setSelectedJoinCodes] = useState<string[]>([]);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinLoading, setJoinLoading] = useState(false);
   const [exitLoading, setExitLoading] = useState(false);
@@ -238,12 +239,24 @@ export default function CampusPage() {
       .finally(() => setLoadingCohort(false));
   }, [selectedCode]);
 
-  const handleJoinCohort = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!joinCodeInput.trim()) return;
+  const handleJoinCohort = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    // Parse codes from input (split by commas, spaces, newlines, semicolons)
+    const manualCodes = joinCodeInput
+      .split(/[\s,;]+/)
+      .map((c) => c.trim().toUpperCase())
+      .filter(Boolean);
+
+    const allCodesToJoin = Array.from(new Set([...selectedJoinCodes, ...manualCodes]));
+
+    if (allCodesToJoin.length === 0) {
+      setJoinError("Please select at least one course or enter course code(s).");
+      return;
+    }
 
     if (!session?.user) {
-      if (confirm("Sign in with GitHub is required to enroll in a live class cohort. Would you like to sign in now?")) {
+      if (confirm("Sign in with GitHub is required to enroll in college class cohorts. Would you like to sign in now?")) {
         signIn("github");
       }
       return;
@@ -256,21 +269,35 @@ export default function CampusPage() {
       const res = await fetch("/api/campus/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: joinCodeInput.trim() }),
+        body: JSON.stringify({ codes: allCodesToJoin }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to join cohort");
+      if (!res.ok) throw new Error(data.error || "Failed to join cohorts");
 
-      // Add to cohorts list if not already there
+      const newlyJoined = Array.isArray(data.cohorts) && data.cohorts.length > 0 ? data.cohorts : [data.cohort];
+
+      // Add to cohorts list
       setCohorts((prev) => {
-        if (prev.some((c) => c.code === data.cohort.code)) return prev;
-        return [data.cohort, ...prev];
+        const existingCodes = new Set(prev.map((c) => c.code));
+        const toAdd = newlyJoined.filter((c: any) => !existingCodes.has(c.code));
+        return [...toAdd, ...prev];
       });
-      setSelectedCode(data.cohort.code);
+
+      if (newlyJoined.length > 0) {
+        setSelectedCode(newlyJoined[0].code);
+      }
+
       setShowJoinModal(false);
       setJoinCodeInput("");
+      setSelectedJoinCodes([]);
+
+      alert(
+        `🎉 Successfully enrolled in ${newlyJoined.length} course${
+          newlyJoined.length > 1 ? "s" : ""
+        }: ${newlyJoined.map((c: any) => c.code).join(", ")}!`
+      );
     } catch (err: any) {
-      setJoinError(err.message);
+      setJoinError(err.message || "Failed to join courses.");
     } finally {
       setJoinLoading(false);
     }
@@ -968,6 +995,47 @@ export default function CampusPage() {
                 </div>
               );
             })}
+
+            {/* + Add Course Button */}
+            <button
+              onClick={() => {
+                setJoinError(null);
+                setJoinCodeInput("");
+                setSelectedJoinCodes([]);
+                setShowJoinModal(true);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "9px 15px",
+                borderRadius: 8,
+                background: "rgba(139,142,255,0.08)",
+                border: "1px dashed rgba(139,142,255,0.35)",
+                color: "#8b8eff",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                fontFamily: "inherit",
+                transition: "all 0.15s ease",
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(139,142,255,0.18)";
+                e.currentTarget.style.borderColor = "#8b8eff";
+                e.currentTarget.style.color = "#fff";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(139,142,255,0.08)";
+                e.currentTarget.style.borderColor = "rgba(139,142,255,0.35)";
+                e.currentTarget.style.color = "#8b8eff";
+              }}
+              title="Join one or multiple courses simultaneously"
+            >
+              <span style={{ fontSize: 14 }}>＋</span>
+              <span>Add Course</span>
+            </button>
           </div>
         )}
 
@@ -1819,13 +1887,14 @@ export default function CampusPage() {
       </div>
       )}
 
-      {/* ── JOIN CLASS MODAL ────────────────────────────────────────────── */}
+      {/* ── BATCH ADD / JOIN CLASS MODAL ────────────────────────────────────── */}
       {showJoinModal && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.75)",
+            background: "rgba(0,0,0,0.8)",
+            backdropFilter: "blur(6px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -1838,49 +1907,198 @@ export default function CampusPage() {
               background: "#0d0e14",
               border: "1px solid rgba(139,142,255,0.3)",
               borderRadius: 14,
-              padding: 28,
-              maxWidth: 440,
+              padding: "26px 28px",
+              maxWidth: 580,
               width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.8)",
             }}
           >
-            <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px", color: "#fff" }}>
-              Enroll in a College Course
-            </h3>
-            <p style={{ fontSize: 12, color: "#8a8898", margin: "0 0 20px", lineHeight: 1.5 }}>
-              Enter the join code provided by your course instructor (e.g. <code>ECE-301-EMBEDDED</code>).
-            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <div>
+                <h3 style={{ fontSize: 19, fontWeight: 800, margin: "0 0 4px", color: "#fff" }}>
+                  Add &amp; Enroll in Courses
+                </h3>
+                <p style={{ fontSize: 12.5, color: "#8a8898", margin: 0, lineHeight: 1.5 }}>
+                  Join multiple university classes at once using course codes or select from available department cohorts.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowJoinModal(false);
+                  setJoinError(null);
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#6e6d7a",
+                  fontSize: 18,
+                  cursor: "pointer",
+                  padding: 4,
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
 
             <form onSubmit={handleJoinCohort}>
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: "block", fontSize: 11, color: "#6e6d7a", marginBottom: 6 }}>
-                  COURSE JOIN CODE
+              {/* Option 1: Course Catalog Multi-Select */}
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Select from Department Cohorts:
+                  </label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const available = demoCohorts
+                          .filter((d) => !cohorts.some((c) => c.code === d.code))
+                          .map((d) => d.code);
+                        setSelectedJoinCodes(available);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#8b8eff",
+                        fontSize: 11,
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        padding: 0,
+                      }}
+                    >
+                      Select All Available
+                    </button>
+                    <span style={{ color: "rgba(255,255,255,0.15)" }}>|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedJoinCodes([])}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--muted2)",
+                        fontSize: 11,
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        padding: 0,
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto", paddingRight: 4 }}>
+                  {demoCohorts.map((d) => {
+                    const isAlreadyEnrolled = cohorts.some((c) => c.code === d.code);
+                    const isChecked = selectedJoinCodes.includes(d.code);
+
+                    return (
+                      <div
+                        key={d.code}
+                        onClick={() => {
+                          if (isAlreadyEnrolled) return;
+                          setSelectedJoinCodes((prev) =>
+                            prev.includes(d.code) ? prev.filter((c) => c !== d.code) : [...prev, d.code]
+                          );
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          background: isAlreadyEnrolled
+                            ? "rgba(255,255,255,0.01)"
+                            : isChecked
+                            ? "rgba(139,142,255,0.14)"
+                            : "rgba(255,255,255,0.03)",
+                          border: isChecked
+                            ? "1px solid #8b8eff"
+                            : "1px solid rgba(255,255,255,0.07)",
+                          cursor: isAlreadyEnrolled ? "default" : "pointer",
+                          opacity: isAlreadyEnrolled ? 0.6 : 1,
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked || isAlreadyEnrolled}
+                            disabled={isAlreadyEnrolled}
+                            onChange={() => {}}
+                            style={{ cursor: isAlreadyEnrolled ? "default" : "pointer", accentColor: "#8b8eff" }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: "#8b8eff", fontFamily: "'JetBrains Mono', monospace" }}>
+                                {d.code}
+                              </span>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {d.title.split(": ")[1] || d.title}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 10.5, color: "var(--muted2)", marginTop: 2 }}>
+                              {d.instructorName} · {d.department}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          {isAlreadyEnrolled ? (
+                            <span style={{ fontSize: 9.5, background: "rgba(74,222,128,0.15)", color: "#4ade80", padding: "2px 6px", borderRadius: 4, fontWeight: 700 }}>
+                              ✓ Enrolled
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 10, color: isChecked ? "#8b8eff" : "var(--muted2)", fontWeight: 600 }}>
+                              {isChecked ? "Selected" : "+ Select"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Option 2: Enter Manual Course Codes */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
+                  Or Enter Course Code(s):
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. ECE-301-EMBEDDED"
+                <textarea
+                  placeholder="Paste or type multiple codes (e.g. ECE-204-EMBEDDED, CS-301-SYSTEMS, CS-402)"
                   value={joinCodeInput}
                   onChange={(e) => setJoinCodeInput(e.target.value)}
+                  rows={2}
                   style={{
                     width: "100%",
                     background: "rgba(255,255,255,0.03)",
                     border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 6,
+                    borderRadius: 8,
                     padding: "10px 14px",
                     color: "#fff",
-                    fontFamily: "inherit",
-                    fontSize: 13,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 12.5,
                     boxSizing: "border-box",
+                    resize: "none",
+                    outline: "none",
                   }}
                 />
+                <div style={{ fontSize: 10.5, color: "var(--muted2)", marginTop: 4 }}>
+                  Tip: Separate multiple course join codes with commas, spaces, or newlines.
+                </div>
               </div>
 
               {joinError && (
-                <div style={{ color: "#f43f5e", fontSize: 12, marginBottom: 14 }}>
+                <div style={{ color: "#f43f5e", fontSize: 12, marginBottom: 14, background: "rgba(244,63,94,0.1)", padding: "8px 12px", borderRadius: 6, border: "1px solid rgba(244,63,94,0.2)" }}>
                   {joinError}
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
                 <button
                   type="button"
                   onClick={() => setShowJoinModal(false)}
@@ -1889,10 +2107,11 @@ export default function CampusPage() {
                     background: "transparent",
                     border: "1px solid rgba(255,255,255,0.1)",
                     color: "#8a8898",
-                    padding: "10px",
-                    borderRadius: 6,
+                    padding: "11px",
+                    borderRadius: 8,
                     cursor: "pointer",
                     fontFamily: "inherit",
+                    fontWeight: 600,
                   }}
                 >
                   Cancel
@@ -1901,18 +2120,34 @@ export default function CampusPage() {
                   type="submit"
                   disabled={joinLoading}
                   style={{
-                    flex: 1,
+                    flex: 1.5,
                     background: "#8b8eff",
                     border: "none",
                     color: "#08090c",
                     fontWeight: 700,
-                    padding: "10px",
-                    borderRadius: 6,
+                    padding: "11px",
+                    borderRadius: 8,
                     cursor: "pointer",
                     fontFamily: "inherit",
+                    fontSize: 13,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
                   }}
                 >
-                  {joinLoading ? "Enrolling..." : "Enroll in Class"}
+                  {joinLoading ? (
+                    "Enrolling..."
+                  ) : (
+                    <>
+                      <span>Join Courses</span>
+                      {selectedJoinCodes.length > 0 && (
+                        <span style={{ background: "rgba(0,0,0,0.25)", color: "#fff", fontSize: 10, padding: "1px 6px", borderRadius: 10 }}>
+                          {selectedJoinCodes.length}
+                        </span>
+                      )}
+                    </>
+                  )}
                 </button>
               </div>
             </form>
