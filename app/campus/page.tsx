@@ -102,6 +102,7 @@ export default function CampusPage() {
   const [joinCodeInput, setJoinCodeInput] = useState("");
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinLoading, setJoinLoading] = useState(false);
+  const [exitLoading, setExitLoading] = useState(false);
 
   const [createForm, setCreateForm] = useState({
     code: "",
@@ -303,6 +304,50 @@ export default function CampusPage() {
       alert(err.message || "Could not enroll in class.");
     } finally {
       setJoinLoading(false);
+    }
+  };
+
+  const handleExitCohort = async (code: string) => {
+    const cohortToExit = cohorts.find((c) => c.code === code) || activeCohort;
+    const courseTitle = cohortToExit?.title || code;
+
+    if (
+      !confirm(
+        `Are you sure you want to unenroll and exit ${code} (${courseTitle})?\n\nYou will be removed from the class roster and this course will no longer appear on your dashboard.`
+      )
+    ) {
+      return;
+    }
+
+    setExitLoading(true);
+    try {
+      const res = await fetch("/api/campus/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to exit course");
+
+      // Update cohorts list in state
+      const remaining = cohorts.filter((c) => c.code !== code);
+      setCohorts(remaining);
+
+      // If we exited the currently selected cohort, switch to next available cohort or clear selection
+      if (selectedCode === code) {
+        if (remaining.length > 0) {
+          setSelectedCode(remaining[0].code);
+        } else {
+          setSelectedCode("");
+          setActiveCohort(null);
+        }
+      }
+
+      alert(`✓ You have successfully exited ${code}.`);
+    } catch (err: any) {
+      alert(err.message || "Could not exit course.");
+    } finally {
+      setExitLoading(false);
     }
   };
 
@@ -848,40 +893,79 @@ export default function CampusPage() {
             {cohorts.map((c) => {
               const isSelected = c.code === selectedCode;
               return (
-                <button
+                <div
                   key={c.code}
-                  onClick={() => setSelectedCode(c.code)}
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
-                    padding: "10px 16px",
                     borderRadius: 8,
                     background: isSelected ? "rgba(139,142,255,0.15)" : "rgba(255,255,255,0.02)",
                     border: `1px solid ${isSelected ? "rgba(139,142,255,0.4)" : "rgba(255,255,255,0.06)"}`,
-                    color: isSelected ? "#fff" : "#8a8898",
-                    fontSize: 12,
-                    fontWeight: isSelected ? 700 : 500,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    fontFamily: "inherit",
+                    transition: "all 0.15s ease",
                   }}
                 >
-                  <span>{c.code}</span>
-                  {!session?.user && c.isDemo && (
-                    <span
-                      style={{
-                        fontSize: 9,
-                        padding: "1px 5px",
-                        borderRadius: 3,
-                        background: "rgba(74,222,128,0.15)",
-                        color: "#4ade80",
-                      }}
-                    >
-                      Sample Demo
-                    </span>
-                  )}
-                </button>
+                  <button
+                    onClick={() => setSelectedCode(c.code)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "10px 14px",
+                      background: "transparent",
+                      border: "none",
+                      color: isSelected ? "#fff" : "#8a8898",
+                      fontSize: 12,
+                      fontWeight: isSelected ? 700 : 500,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    <span>{c.code}</span>
+                    {!session?.user && c.isDemo && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          padding: "1px 5px",
+                          borderRadius: 3,
+                          background: "rgba(74,222,128,0.15)",
+                          color: "#4ade80",
+                        }}
+                      >
+                        Sample Demo
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleExitCohort(c.code);
+                    }}
+                    title={`Exit and unenroll from ${c.code}`}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: isSelected ? "#f87171" : "#6e6d7a",
+                      fontSize: 12,
+                      padding: "6px 10px 6px 2px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      opacity: isSelected ? 0.8 : 0.4,
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = "1";
+                      e.currentTarget.style.color = "#ef4444";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = isSelected ? "0.8" : "0.4";
+                      e.currentTarget.style.color = isSelected ? "#f87171" : "#6e6d7a";
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
               );
             })}
           </div>
@@ -1168,14 +1252,14 @@ export default function CampusPage() {
                   <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", letterSpacing: 1, marginBottom: 8 }}>
                     {activeCohort.code}
                   </div>
-                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", alignItems: "center" }}>
                     <button
                       onClick={copyJoinCode}
                       style={{
                         background: "rgba(139,142,255,0.15)",
                         border: "1px solid rgba(139,142,255,0.3)",
                         color: "#8b8eff",
-                        padding: "5px 12px",
+                        padding: "6px 12px",
                         borderRadius: 6,
                         fontSize: 11,
                         fontWeight: 600,
@@ -1185,7 +1269,7 @@ export default function CampusPage() {
                     >
                       {copiedCode ? "✓ Copied to Clipboard" : "Copy Join Code"}
                     </button>
-                    {isStudent && !activeCohort.students.some((s) => s.userId === userId) && (
+                    {isStudent && !cohorts.some((c) => c.code === activeCohort.code) && (
                       <button
                         onClick={() => handleEnrollCurrentCohort(activeCohort.code)}
                         disabled={joinLoading}
@@ -1193,7 +1277,7 @@ export default function CampusPage() {
                           background: "#4ade80",
                           border: "none",
                           color: "#000",
-                          padding: "5px 12px",
+                          padding: "6px 12px",
                           borderRadius: 6,
                           fontSize: 11,
                           fontWeight: 700,
@@ -1202,6 +1286,32 @@ export default function CampusPage() {
                         }}
                       >
                         {joinLoading ? "Enrolling..." : "Enroll in Course"}
+                      </button>
+                    )}
+                    {cohorts.some((c) => c.code === activeCohort.code) && (
+                      <button
+                        onClick={() => handleExitCohort(activeCohort.code)}
+                        disabled={exitLoading}
+                        style={{
+                          background: "rgba(239, 68, 68, 0.12)",
+                          border: "1px solid rgba(239, 68, 68, 0.35)",
+                          color: "#f87171",
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(239, 68, 68, 0.22)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(239, 68, 68, 0.12)")}
+                        title={`Unenroll and exit ${activeCohort.code}`}
+                      >
+                        <span>🚪</span> {exitLoading ? "Exiting..." : "Exit Course"}
                       </button>
                     )}
                   </div>

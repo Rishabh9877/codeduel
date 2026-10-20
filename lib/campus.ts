@@ -1,5 +1,5 @@
 import { dynamo, TABLE } from "@/lib/dynamo";
-import { GetCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, GetCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { STARTING_ELO } from "./elo";
 
 export * from "./campus-data";
@@ -478,4 +478,63 @@ export async function joinCohort(code: string, user: { id: string; name: string;
   }
 
   return cohort;
+}
+
+export async function leaveCohort(code: string, userId: string) {
+  const cleanCode = code.toUpperCase().trim();
+
+  // 1. Delete student record from the cohort's roster
+  try {
+    await dynamo.send(
+      new DeleteCommand({
+        TableName: TABLE,
+        Key: {
+          PK: `COHORT#${cleanCode}`,
+          SK: `STUDENT#${userId}`,
+        },
+      })
+    );
+  } catch (err) {
+    console.warn("Could not delete STUDENT record on leave:", err);
+  }
+
+  // 2. Delete user's enrollment link
+  try {
+    await dynamo.send(
+      new DeleteCommand({
+        TableName: TABLE,
+        Key: {
+          PK: `USER#${userId}`,
+          SK: `ENROLLED#${cleanCode}`,
+        },
+      })
+    );
+  } catch (err) {
+    console.warn("Could not delete ENROLLED link on leave:", err);
+  }
+
+  // 3. Decrement studentCount on metadata if exists
+  try {
+    const metaRes = await dynamo.send(
+      new GetCommand({
+        TableName: TABLE,
+        Key: { PK: `COHORT#${cleanCode}`, SK: "METADATA" },
+      })
+    );
+    if (metaRes.Item && (metaRes.Item.studentCount || 0) > 0) {
+      await dynamo.send(
+        new PutCommand({
+          TableName: TABLE,
+          Item: {
+            ...metaRes.Item,
+            studentCount: Math.max(0, (metaRes.Item.studentCount || 1) - 1),
+          },
+        })
+      );
+    }
+  } catch (err) {
+    console.warn("Could not update cohort studentCount on leave:", err);
+  }
+
+  return { success: true, code: cleanCode };
 }
