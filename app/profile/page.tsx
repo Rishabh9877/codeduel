@@ -24,6 +24,9 @@ interface ProfileData {
   eloHistory: { label: string; elo: number }[];
   recentMatches: { matchId: string; problem: string; opponent: string; opponentAvatar: string | null; result: "WIN" | "LOSS"; eloChange: string; playedAt: string }[];
   activityMap: Record<string, number>;
+  subscriptionTier?: "FREE" | "PRO" | "CAMPUS";
+  isPro?: boolean;
+  isCampus?: boolean;
 }
 
 // ─── Custom chart tooltip ─────────────────────────────────────────────────────
@@ -414,6 +417,102 @@ export default function ProfilePage() {
 
             {/* RIGHT COL */}
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {/* SUBSCRIPTION & PRO STATUS CARD */}
+              <div
+                style={{
+                  ...S.card,
+                  background: profile.isPro
+                    ? "linear-gradient(135deg, rgba(139,142,255,0.12) 0%, rgba(139,142,255,0.03) 100%)"
+                    : "#111317",
+                  border: profile.isPro
+                    ? "1px solid rgba(139,142,255,0.35)"
+                    : "1px solid #2a2c30",
+                }}
+              >
+                <div style={S.sectionHdr}>
+                  <span style={S.sectionTtl}>Subscription Plan</span>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: profile.isPro
+                        ? "rgba(139,142,255,0.2)"
+                        : profile.isCampus
+                        ? "rgba(56,189,248,0.2)"
+                        : "rgba(255,255,255,0.08)",
+                      color: profile.isPro
+                        ? "#8b8eff"
+                        : profile.isCampus
+                        ? "#38bdf8"
+                        : "#8a8c82",
+                      border: `1px solid ${
+                        profile.isPro
+                          ? "rgba(139,142,255,0.4)"
+                          : profile.isCampus
+                          ? "rgba(56,189,248,0.4)"
+                          : "rgba(255,255,255,0.15)"
+                      }`,
+                    }}
+                  >
+                    {profile.isPro
+                      ? "👑 PRO ENGINEER"
+                      : profile.isCampus
+                      ? "🏛️ CAMPUS LICENSE"
+                      : "FREE STUDENT"}
+                  </span>
+                </div>
+
+                <p style={{ ...S.muted, marginBottom: 14, lineHeight: 1.5 }}>
+                  {profile.isPro
+                    ? "Active Pro membership with unrestricted AI coaching, priority multi-file compilation, and oscilloscope telemetry."
+                    : profile.isCampus
+                    ? "Enrolled under university department license with automated lab grading and cohort telemetry."
+                    : "Basic free tier. Upgrade to unlock full 3-tier AI hints, oscilloscope simulation, and verified portfolio badge."}
+                </p>
+
+                {profile.isPro ? (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Link
+                      href="/pricing"
+                      style={{
+                        flex: 1,
+                        textAlign: "center",
+                        background: "rgba(139,142,255,0.12)",
+                        border: "1px solid rgba(139,142,255,0.3)",
+                        color: "#8b8eff",
+                        fontWeight: 700,
+                        fontSize: 12,
+                        padding: "8px 12px",
+                        borderRadius: 6,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Manage Plan Details →
+                    </Link>
+                  </div>
+                ) : (
+                  <Link
+                    href="/pricing"
+                    style={{
+                      display: "block",
+                      textAlign: "center",
+                      background: "linear-gradient(135deg, #8b8eff, #6366f1)",
+                      color: "#0b0c0e",
+                      fontWeight: 800,
+                      fontSize: 12,
+                      padding: "9px 14px",
+                      borderRadius: 6,
+                      textDecoration: "none",
+                      boxShadow: "0 4px 14px rgba(139,142,255,0.25)",
+                    }}
+                  >
+                    ⚡ Upgrade to Pro (₹100/mo) →
+                  </Link>
+                )}
+              </div>
+
               {/* PUBLIC PORTFOLIO & PRIVACY CARD */}
               <div style={S.card}>
                 <div style={S.sectionHdr}>

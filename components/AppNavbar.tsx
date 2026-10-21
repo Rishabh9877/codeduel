@@ -8,7 +8,7 @@ import { useUserRole } from "@/lib/useUserRole";
 import RoleBadgeSwitcher from "@/components/RoleBadgeSwitcher";
 
 interface AppNavbarProps {
-  activePage?: "dashboard" | "practice" | "campus" | "leaderboard" | "friends" | "profile" | "admin";
+  activePage?: "dashboard" | "practice" | "campus" | "leaderboard" | "friends" | "profile" | "admin" | "pricing";
   onFindMatch?: () => void;
   matchState?: "idle" | "queued" | "matched";
   onCancelMatch?: () => void;
@@ -113,6 +113,9 @@ export default function AppNavbar({
               >
                 ⚡ Metrics
               </Link>
+              <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
+                Pricing
+              </Link>
               <Link href="/friends" style={getNavLinkStyle(activePage === "friends")}>
                 Friends
               </Link>
@@ -125,14 +128,14 @@ export default function AppNavbar({
               <Link href="/campus" style={getNavLinkStyle(activePage === "campus")}>
                 Faculty Hub
               </Link>
-              <Link href="/campus" style={getNavLinkStyle(false)}>
-                Class Cohorts
-              </Link>
               <Link href="/practice" style={getNavLinkStyle(activePage === "practice")}>
                 Problem Sandbox
               </Link>
               <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
                 Leaderboard
+              </Link>
+              <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
+                Pricing
               </Link>
               <Link href="/profile" style={getNavLinkStyle(activePage === "profile")}>
                 Profile
@@ -154,6 +157,9 @@ export default function AppNavbar({
               </Link>
               <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
                 Leaderboard
+              </Link>
+              <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
+                Pricing
               </Link>
               <Link href="/friends" style={getNavLinkStyle(activePage === "friends")}>
                 Friends
@@ -177,6 +183,18 @@ export default function AppNavbar({
               <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
                 Leaderboard
               </Link>
+              <Link
+                href="/pricing"
+                style={{
+                  ...getNavLinkStyle(activePage === "pricing"),
+                  color: "#8b8eff",
+                  fontWeight: 700,
+                  background: activePage === "pricing" ? "rgba(139,142,255,0.18)" : "rgba(139,142,255,0.08)",
+                  border: "1px solid rgba(139,142,255,0.25)",
+                }}
+              >
+                ⚡ Pricing / Pro
+              </Link>
               <Link href="/friends" style={getNavLinkStyle(activePage === "friends")}>
                 Friends
               </Link>
@@ -193,6 +211,28 @@ export default function AppNavbar({
         {customRightContent}
 
         <RoleBadgeSwitcher initialRole={role} onRoleChanged={setRole} />
+
+        {status === "authenticated" && !isFaculty && !isAdmin && (
+          <Link
+            href="/pricing"
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              background: "linear-gradient(135deg, rgba(139,142,255,0.15) 0%, rgba(99,102,241,0.2) 100%)",
+              border: "1px solid rgba(139,142,255,0.35)",
+              color: "#c4b5fd",
+              padding: "6px 12px",
+              borderRadius: 7,
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              transition: "all 0.15s ease",
+            }}
+          >
+            <span>⚡</span> Pro
+          </Link>
+        )}
 
         {isFaculty ? (
           <Link
@@ -379,6 +419,24 @@ export default function AppNavbar({
                   }}
                 >
                   👤 My Profile
+                </Link>
+
+                <Link
+                  href="/pricing"
+                  style={{
+                    padding: "9px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#8b8eff",
+                    textDecoration: "none",
+                    borderBottom: "1px solid rgba(255,255,255,0.04)",
+                    background: "rgba(139,142,255,0.06)",
+                  }}
+                >
+                  ⚡ Upgrade to Pro / Pricing
                 </Link>
 
                 {isAdmin && (

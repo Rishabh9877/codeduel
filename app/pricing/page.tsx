@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession, signIn } from "next-auth/react";
 import { PRICING_PLANS, PRICING_FAQS, PricingPlan, Currency } from "@/lib/pricing";
 import AppNavbar from "@/components/AppNavbar";
 
 export default function PricingPage() {
+  const { data: session, status } = useSession();
+  const [userTier, setUserTier] = useState<"FREE" | "PRO" | "CAMPUS" | null>(null);
+  const [loadingTier, setLoadingTier] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
   const [currency, setCurrency] = useState<Currency>("INR");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("annual");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -34,13 +39,84 @@ export default function PricingPage() {
   const hardwareLabCostSaved = calcStudents * 12000; // Average ₹12,000 per bench DSO/microcontroller kit
   const costPerStudentINR = Math.round(40000 / calcStudents);
 
-  const handlePlanClick = (plan: PricingPlan) => {
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    setLoadingTier(true);
+    fetch("/api/user/subscription")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.tier) setUserTier(d.tier);
+      })
+      .catch((err) => console.warn("Failed to load subscription tier:", err))
+      .finally(() => setLoadingTier(false));
+  }, [status]);
+
+  const handlePlanClick = async (plan: PricingPlan) => {
     if (plan.id === "FREE") {
+      if (userTier === "PRO") {
+        if (confirm("Are you sure you want to switch from Pro back to the Free Student tier?")) {
+          setIsUpgrading(true);
+          try {
+            const res = await fetch("/api/user/subscription", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ tier: "FREE" }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+              setUserTier("FREE");
+              setCheckoutNotice("Plan switched back to Free Student.");
+            } else {
+              alert(data.error || "Failed to update plan");
+            }
+          } catch {
+            alert("Network error updating plan");
+          } finally {
+            setIsUpgrading(false);
+          }
+        }
+        return;
+      }
       window.location.href = "/practice";
       return;
     }
-    setSelectedPlanForModal(plan);
-    setShowPilotModal(true);
+
+    if (plan.id === "PRO") {
+      if (status !== "authenticated") {
+        signIn("github");
+        return;
+      }
+      if (userTier === "PRO") {
+        setCheckoutNotice("You already have an active Pro Engineer plan!");
+        return;
+      }
+
+      setIsUpgrading(true);
+      try {
+        const res = await fetch("/api/user/subscription", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tier: "PRO" }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setUserTier("PRO");
+          setCheckoutNotice("🎉 Upgraded to Pro Engineer! All advanced hardware simulation & 3-tier AI hints are active.");
+        } else {
+          alert(data.error || "Failed to upgrade to Pro");
+        }
+      } catch {
+        alert("Network error upgrading to Pro");
+      } finally {
+        setIsUpgrading(false);
+      }
+      return;
+    }
+
+    if (plan.id === "CAMPUS") {
+      setSelectedPlanForModal(plan);
+      setShowPilotModal(true);
+    }
   };
 
   const handlePilotSubmit = async (e: React.FormEvent) => {
@@ -90,7 +166,7 @@ export default function PricingPage() {
       }}
     >
       {/* ── TOP NAV ──────────────────────────────────────────────────────── */}
-      <AppNavbar />
+      <AppNavbar activePage="pricing" />
 
       <main style={{ maxWidth: 1140, margin: "0 auto", padding: "48px 24px 80px" }}>
         {/* CHECKOUT NOTICE TOAST */}
@@ -327,9 +403,10 @@ export default function PricingPage() {
                 </div>
 
                 {/* CTA Button */}
-                <button
-                  onClick={() => handlePlanClick(plan)}
-                  style={{
+                {(() => {
+                  const isCurrent = userTier === plan.id;
+                  let btnText = ctaText;
+                  let btnStyle: React.CSSProperties = {
                     background: plan.highlighted ? "#8b8eff" : "rgba(255,255,255,0.06)",
                     color: plan.highlighted ? "#08090c" : "#fff",
                     border: plan.highlighted ? "none" : "1px solid rgba(255,255,255,0.12)",
@@ -341,10 +418,35 @@ export default function PricingPage() {
                     marginBottom: 28,
                     fontFamily: "inherit",
                     transition: "all 0.15s ease",
-                  }}
-                >
-                  {ctaText}
-                </button>
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                  };
+
+                  if (isUpgrading) {
+                    btnText = "Updating...";
+                  } else if (isCurrent) {
+                    btnText = plan.id === "PRO" ? "👑 Current Plan (Active)" : plan.id === "CAMPUS" ? "🏛️ Active Campus Seat" : "✓ Current Plan";
+                    btnStyle.background = plan.id === "PRO" ? "rgba(139,142,255,0.2)" : "rgba(255,255,255,0.05)";
+                    btnStyle.color = plan.id === "PRO" ? "#8b8eff" : "#8a8898";
+                    btnStyle.border = plan.id === "PRO" ? "1px solid rgba(139,142,255,0.4)" : "1px solid rgba(255,255,255,0.08)";
+                  } else if (plan.id === "FREE" && userTier === "PRO") {
+                    btnText = "Switch to Free";
+                  } else if (plan.id === "PRO") {
+                    btnText = isINR ? "⚡ Upgrade to Pro (₹100/mo)" : "⚡ Upgrade to Pro ($19/mo)";
+                  }
+
+                  return (
+                    <button
+                      onClick={() => handlePlanClick(plan)}
+                      disabled={isUpgrading || (isCurrent && plan.id !== "PRO")}
+                      style={btnStyle}
+                    >
+                      {btnText}
+                    </button>
+                  );
+                })()}
 
                 {/* Features List */}
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 20, flex: 1 }}>

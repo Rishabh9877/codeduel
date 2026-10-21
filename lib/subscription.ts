@@ -1,5 +1,5 @@
 import { dynamo, TABLE } from "@/lib/dynamo";
-import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import type { SubscriptionTier } from "@/lib/pricing";
 
 export async function getUserSubscriptionTier(userId: string): Promise<SubscriptionTier> {
@@ -32,6 +32,29 @@ export async function getUserSubscriptionTier(userId: string): Promise<Subscript
   }
 
   return "FREE";
+}
+
+export async function updateUserSubscriptionTier(
+  userId: string,
+  tier: SubscriptionTier
+): Promise<boolean> {
+  try {
+    await dynamo.send(
+      new UpdateCommand({
+        TableName: TABLE,
+        Key: { PK: `USER#${userId}`, SK: "PROFILE" },
+        UpdateExpression: "SET subscriptionTier = :tier, subscriptionUpdatedAt = :now",
+        ExpressionAttributeValues: {
+          ":tier": tier,
+          ":now": Date.now(),
+        },
+      })
+    );
+    return true;
+  } catch (err) {
+    console.error("Failed to update subscription tier:", err);
+    return false;
+  }
 }
 
 export async function checkUserDuelQuota(userId: string): Promise<{

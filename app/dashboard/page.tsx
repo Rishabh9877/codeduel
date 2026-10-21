@@ -1249,6 +1249,24 @@ export default function Dashboard() {
               >
                 <span>🏫</span> Campus Cohorts & Labs →
               </Link>
+              <Link
+                href="/pricing"
+                style={{
+                  background: "rgba(139,142,255,0.1)",
+                  border: "1px solid rgba(139,142,255,0.25)",
+                  color: "#c4b5fd",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>⚡</span> Pro Plans
+              </Link>
             </div>
           </div>
         ) : selectedRole === "FACULTY" ? (
@@ -1392,6 +1410,24 @@ export default function Dashboard() {
                 }}
               >
                 <span>🏆</span> Leaderboard
+              </Link>
+              <Link
+                href="/pricing"
+                style={{
+                  background: "linear-gradient(135deg, rgba(139,142,255,0.2) 0%, rgba(99,102,241,0.1) 100%)",
+                  border: "1px solid rgba(139,142,255,0.35)",
+                  color: "#c4b5fd",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "7px 14px",
+                  borderRadius: 7,
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <span>⚡</span> Pro &amp; Pricing
               </Link>
             </div>
           </div>

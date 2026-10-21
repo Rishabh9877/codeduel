@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { GetCommand, PutCommand, ScanCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { STARTING_ELO } from "@/lib/elo";
+import { getUserSubscriptionTier } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -171,6 +172,7 @@ export async function GET() {
     }
 
     const peakElo = Math.max(...eloHistory.map((h) => h.elo), currentElo);
+    const subscriptionTier = await getUserSubscriptionTier(userId);
 
     return NextResponse.json({
       username: dynItem.username ?? session.user.name ?? "Engineer",
@@ -180,6 +182,9 @@ export async function GET() {
       role: dynItem.role || (isAdminUser ? "ADMIN" : "INDIVIDUAL"),
       isAdmin: dynItem.role === "ADMIN",
       canBeAdmin: Boolean(isAdminUser),
+      subscriptionTier,
+      isPro: subscriptionTier === "PRO",
+      isCampus: subscriptionTier === "CAMPUS",
       peakElo,
       globalRank,
       wins,
