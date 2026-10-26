@@ -53,6 +53,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Match already finished" }, { status: 409 });
     }
 
+    // 4.5 — Server-Authoritative 15-Minute Deadline Enforcement
+    const matchDurationMs = 15 * 60 * 1000;
+    const startedAt = match.startedAt || match.createdAt || 0;
+    if (startedAt && (Date.now() - startedAt >= matchDurationMs)) {
+      await dynamo.send(
+        new UpdateCommand({
+          TableName: TABLE,
+          Key: { PK: `MATCH#${matchId}`, SK: "META" },
+          UpdateExpression: "SET #s = :timeoutStatus, endedBy = :by, finishedAt = :now",
+          ConditionExpression: "#s = :activeStatus",
+          ExpressionAttributeNames: { "#s": "status" },
+          ExpressionAttributeValues: {
+            ":activeStatus": "active",
+            ":timeoutStatus": "timed_out",
+            ":by": "server_deadline",
+            ":now": Date.now(),
+          },
+        })
+      ).catch(() => {});
+
+      return NextResponse.json(
+        { error: "Match expired: 15-minute deadline exceeded", status: "timed_out" },
+        { status: 410 }
+      );
+    }
+
     // 5 — Get challenge definition
     const challenge = getChallengeById(match.challengeId);
     if (!challenge) {
@@ -150,102 +176,145 @@ export async function POST(req: Request) {
 
       console.log(`[SUBMIT Step 4] Committing match victory: winnerId=${winner.userId} (${liveWinnerElo} -> ${newWinnerElo}), loserId=${loser.userId} (${liveLoserElo} -> ${newLoserElo})`);
 
-      await dynamo.send(
-        new TransactWriteCommand({
-          TransactItems: [
-            // 1. Mark match finished
-            {
-              Update: {
-                TableName: TABLE,
-                Key: { PK: `MATCH#${matchId}`, SK: "META" },
-                UpdateExpression:
-                  "SET #s = :status, winnerId = :wid, finishedAt = :now, endedBy = :by, newWinnerElo = :nwe, newLoserElo = :nle",
-                ExpressionAttributeNames: { "#s": "status" },
-                ExpressionAttributeValues: {
-                  ":status": "finished",
-                  ":wid": userId,
-                  ":now": now,
-                  ":by": "submission",
-                  ":nwe": newWinnerElo,
-                  ":nle": newLoserElo,
+      try {
+        await dynamo.send(
+          new TransactWriteCommand({
+            TransactItems: [
+              // 1. Mark match finished with atomic condition check
+              {
+                Update: {
+                  TableName: TABLE,
+                  Key: { PK: `MATCH#${matchId}`, SK: "META" },
+                  UpdateExpression:
+                    "SET #s = :status, winnerId = :wid, finishedAt = :now, endedBy = :by, newWinnerElo = :nwe, newLoserElo = :nle",
+                  ConditionExpression: "#s = :activeStatus",
+                  ExpressionAttributeNames: { "#s": "status" },
+                  ExpressionAttributeValues: {
+                    ":activeStatus": "active",
+                    ":status": "finished",
+                    ":wid": userId,
+                    ":now": now,
+                    ":by": "submission",
+                    ":nwe": newWinnerElo,
+                    ":nle": newLoserElo,
+                  },
                 },
               },
-            },
 
-            // 2. Winner profile update
-            {
-              Put: {
-                TableName: TABLE,
-                Item: {
-                  PK: `USER#${winner.userId}`,
-                  SK: "PROFILE",
-                  userId: winner.userId,
-                  username: winner.username,
-                  avatar: winner.avatar ?? null,
-                  elo: newWinnerElo,
-                  wins: winnerWins,
-                  losses: winnerLosses,
-                  createdAt: winnerProfileResult.Item?.createdAt ?? now,
+              // 2. Winner profile update
+              {
+                Put: {
+                  TableName: TABLE,
+                  Item: {
+                    PK: `USER#${winner.userId}`,
+                    SK: "PROFILE",
+                    userId: winner.userId,
+                    username: winner.username,
+                    avatar: winner.avatar ?? null,
+                    elo: newWinnerElo,
+                    wins: winnerWins,
+                    losses: winnerLosses,
+                    createdAt: winnerProfileResult.Item?.createdAt ?? now,
+                  },
                 },
               },
-            },
 
-            // 3. Winner leaderboard entry
-            {
-              Put: {
-                TableName: TABLE,
-                Item: {
-                  PK: `USER#${winner.userId}`,
-                  SK: "LEADERBOARD",
-                  GSI1PK: "LEADERBOARD#GLOBAL",
-                  GSI1SK: newWinnerElo,
-                  userId: winner.userId,
-                  username: winner.username,
-                  avatar: winner.avatar ?? null,
-                  wins: winnerWins,
-                  losses: winnerLosses,
+              // 3. Winner leaderboard entry
+              {
+                Put: {
+                  TableName: TABLE,
+                  Item: {
+                    PK: `USER#${winner.userId}`,
+                    SK: "LEADERBOARD",
+                    GSI1PK: "LEADERBOARD#GLOBAL",
+                    GSI1SK: newWinnerElo,
+                    userId: winner.userId,
+                    username: winner.username,
+                    avatar: winner.avatar ?? null,
+                    wins: winnerWins,
+                    losses: winnerLosses,
+                  },
                 },
               },
-            },
 
-            // 4. Loser profile update
-            {
-              Put: {
-                TableName: TABLE,
-                Item: {
-                  PK: `USER#${loser.userId}`,
-                  SK: "PROFILE",
-                  userId: loser.userId,
-                  username: loser.username,
-                  avatar: loser.avatar ?? null,
-                  elo: newLoserElo,
-                  wins: loserWins,
-                  losses: loserLosses,
-                  createdAt: loserProfileResult.Item?.createdAt ?? now,
+              // 4. Loser profile update
+              {
+                Put: {
+                  TableName: TABLE,
+                  Item: {
+                    PK: `USER#${loser.userId}`,
+                    SK: "PROFILE",
+                    userId: loser.userId,
+                    username: loser.username,
+                    avatar: loser.avatar ?? null,
+                    elo: newLoserElo,
+                    wins: loserWins,
+                    losses: loserLosses,
+                    createdAt: loserProfileResult.Item?.createdAt ?? now,
+                  },
                 },
               },
-            },
 
-            // 5. Loser leaderboard entry
-            {
-              Put: {
-                TableName: TABLE,
-                Item: {
-                  PK: `USER#${loser.userId}`,
-                  SK: "LEADERBOARD",
-                  GSI1PK: "LEADERBOARD#GLOBAL",
-                  GSI1SK: newLoserElo,
-                  userId: loser.userId,
-                  username: loser.username,
-                  avatar: loser.avatar ?? null,
-                  wins: loserWins,
-                  losses: loserLosses,
+              // 5. Loser leaderboard entry
+              {
+                Put: {
+                  TableName: TABLE,
+                  Item: {
+                    PK: `USER#${loser.userId}`,
+                    SK: "LEADERBOARD",
+                    GSI1PK: "LEADERBOARD#GLOBAL",
+                    GSI1SK: newLoserElo,
+                    userId: loser.userId,
+                    username: loser.username,
+                    avatar: loser.avatar ?? null,
+                    wins: loserWins,
+                    losses: loserLosses,
+                  },
                 },
               },
-            },
-          ],
-        })
-      );
+            ],
+          })
+        );
+      } catch (err: any) {
+        if (
+          err?.name === "TransactionCanceledException" ||
+          err?.name === "ConditionalCheckFailedException" ||
+          (err?.message && err.message.includes("ConditionalCheckFailed"))
+        ) {
+          // A concurrent submission already resolved this match!
+          // Fetch the current finalized state to return idempotent match resolution.
+          const currentMatchRes = await dynamo.send(
+            new GetCommand({ TableName: TABLE, Key: { PK: `MATCH#${matchId}`, SK: "META" } })
+          );
+          const finalMatch = currentMatchRes.Item ?? match;
+          const userWon = finalMatch.winnerId === userId;
+          const userEloChange = userWon
+            ? (finalMatch.newWinnerElo ? finalMatch.newWinnerElo - liveWinnerElo : 0)
+            : (finalMatch.newLoserElo ? finalMatch.newLoserElo - liveWinnerElo : 0);
+
+          return NextResponse.json({
+            result: userWon ? "accepted" : "already_finalized",
+            testsPassed: execution.passed,
+            testsTotal: execution.total,
+            runtimeMs: execution.runtimeMs,
+            testResults: execution.testResults,
+            stdout: execution.stdout?.substring(0, 2000) ?? null,
+            stderr: execution.stderr?.substring(0, 2000) ?? null,
+            matchOver: true,
+            won: userWon,
+            eloChange: userEloChange,
+            newElo: userWon ? finalMatch.newWinnerElo : finalMatch.newLoserElo,
+            walkthrough: challenge.walkthrough ? {
+              rootCause: challenge.walkthrough.rootCause,
+              buggyVsFixedDiff: challenge.walkthrough.buggyVsFixedDiff,
+              whyItMatters: challenge.walkthrough.whyItMatters,
+              commonMistakes: challenge.walkthrough.commonMistakes,
+            } : undefined,
+            canonicalSolution: challenge.canonicalSolution || challenge.walkthrough?.buggyVsFixedDiff,
+          });
+        }
+        throw err;
+      }
 
       return NextResponse.json({
         result: "accepted",

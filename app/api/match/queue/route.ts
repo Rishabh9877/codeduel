@@ -202,8 +202,13 @@ export async function POST(req: Request) {
           ConditionExpression: "attribute_exists(PK)",
         })
       );
-    } catch (err) {
-      if (err instanceof ConditionalCheckFailedException) {
+    } catch (err: any) {
+      if (
+        err instanceof ConditionalCheckFailedException ||
+        err?.name === "ConditionalCheckFailedException" ||
+        err?.name === "TransactionCanceledException" ||
+        (err?.message && err.message.includes("ConditionalCheckFailed"))
+      ) {
         // Someone else claimed opponent, re-queue self
         await enqueueSelf(userId, username, myElo, requestedTrack, initialQueuedAt);
         return NextResponse.json({ status: "waiting", queuedAt: initialQueuedAt, waitTimeMs: waitDurationMs });

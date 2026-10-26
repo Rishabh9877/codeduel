@@ -148,14 +148,17 @@ export default function MatchArena() {
 
   // Dynamically calculated ELO results for Modal & Post-Mortem Drawer consistency
   const myStartElo = (myRole && match ? match[myRole]?.elo : null) ?? 1000;
-  const myNewCalculatedElo = won === true
-    ? (finalMatchPayload?.newWinnerElo ?? (submitResult?.newElo ?? (myStartElo + 16)))
-    : won === false
-    ? (finalMatchPayload?.newLoserElo ?? Math.max(800, myStartElo - 16))
-    : myStartElo;
-  const myCalculatedEloDelta = typeof submitResult?.eloChange === "number" && won === true
+  const serverEloDelta = typeof submitResult?.eloChange === "number"
     ? submitResult.eloChange
-    : (myNewCalculatedElo - myStartElo);
+    : (won === true && typeof finalMatchPayload?.newWinnerElo === "number")
+    ? (finalMatchPayload.newWinnerElo - myStartElo)
+    : (won === false && typeof finalMatchPayload?.newLoserElo === "number")
+    ? (finalMatchPayload.newLoserElo - myStartElo)
+    : null;
+
+  const fallbackEloDelta = won === true ? 16 : won === false ? -16 : 0;
+  const myCalculatedEloDelta = serverEloDelta !== null ? serverEloDelta : fallbackEloDelta;
+  const myNewCalculatedElo = Math.max(800, myStartElo + myCalculatedEloDelta);
   const formattedEloDelta = won === null
     ? "±0"
     : (myCalculatedEloDelta >= 0 ? `+${myCalculatedEloDelta}` : `${myCalculatedEloDelta}`);

@@ -638,6 +638,23 @@ async function executeUniversalCommand(command: any): Promise<any> {
   // 7. TransactWriteCommand
   if (command.constructor?.name === "TransactWriteCommand" || input.TransactItems) {
     const items = input.TransactItems ?? [];
+
+    // Phase 1: Atomically validate all condition expressions
+    for (const step of items) {
+      const op = step.Put || step.Update || step.Delete;
+      if (op && op.ConditionExpression) {
+        const pk = op.Key?.PK || op.Item?.PK;
+        const sk = op.Key?.SK || op.Item?.SK;
+        const existing = memoryStore.get(`${pk}###${sk}`);
+        if (!evaluateCondition(existing, op.ConditionExpression, op.ExpressionAttributeNames, op.ExpressionAttributeValues)) {
+          const err: any = new Error("Transaction cancelled, please refer to cancellation reasons: [ConditionalCheckFailed]");
+          err.name = "TransactionCanceledException";
+          err.CancellationReasons = [{ Code: "ConditionalCheckFailed" }];
+          throw err;
+        }
+      }
+    }
+
     for (const step of items) {
       if (step.Put) {
         const item = step.Put.Item;

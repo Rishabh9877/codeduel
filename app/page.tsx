@@ -661,12 +661,10 @@ export default function LandingPage() {
                   {previewTab === "embedded" ? (
                     <>
                       <div><span className="cm">// Issue #44: UART Ring Buffer Telemetry Loss under high baud rate</span></div>
-                      <div><span className="cm">// BUG: Off-by-one check drops valid packet when tail wraps buffer limit</span></div>
                       <div><span className="k">bool </span><span className="fn">ring_buf_enqueue</span><span className="pn">(ring_buf_t *rb, </span><span className="k">uint8_t </span>byte<span className="pn">) {"{"}</span></div>
                       <div>&nbsp;&nbsp;<span className="k">uint32_t </span>next_head = (rb-&gt;head + <span className="num">1</span>) % rb-&gt;capacity;</div>
-                      <div>&nbsp;&nbsp;<span className="cm">// Defect: rejects valid byte when index equals tail offset</span></div>
                       <div>&nbsp;&nbsp;<span className="k">if </span>(next_head == rb-&gt;tail) <span className="pn">{"{"}</span></div>
-                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="err">return false; // Packet lost during DMA burst!</span></div>
+                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="err">return false;</span></div>
                       <div>&nbsp;&nbsp;<span className="pn">{"}"}</span></div>
                       <div>&nbsp;&nbsp;rb-&gt;buffer[rb-&gt;head] = byte;</div>
                       <div>&nbsp;&nbsp;rb-&gt;head = next_head;</div>
@@ -676,11 +674,9 @@ export default function LandingPage() {
                   ) : (
                     <>
                       <div><span className="cm">// Incident #812: API Gateway Token Bucket Rate Limiter Starvation</span></div>
-                      <div><span className="cm">// BUG: Math.floor(elapsed / 1000) truncates sub-second token replenishment</span></div>
                       <div><span className="k">export class </span><span className="fn">TokenBucket</span><span className="pn"> {"{"}</span></div>
                       <div>&nbsp;&nbsp;<span className="fn">allowRequest</span><span className="pn">(tokensNeeded = <span className="num">1</span>): </span><span className="k">boolean</span> <span className="pn">{"{"}</span></div>
                       <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="k">const </span>elapsedMs = Date.now() - <span className="k">this</span>.lastRefillMs;</div>
-                      <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="cm">// Defect: integer division truncates fractional seconds to 0</span></div>
                       <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="err">const refill = Math.floor(elapsedMs / 1000) * this.refillRate;</span></div>
                       <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="k">this</span>.tokens = Math.min(<span className="k">this</span>.capacity, <span className="k">this</span>.tokens + refill);</div>
                       <div>&nbsp;&nbsp;&nbsp;&nbsp;<span className="k">if </span>(<span className="k">this</span>.tokens &gt;= tokensNeeded) <span className="pn">{"{"}</span> <span className="k">this</span>.tokens -= tokensNeeded; <span className="k">return true</span>; <span className="pn">{"}"}</span></div>

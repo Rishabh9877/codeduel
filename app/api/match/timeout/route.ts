@@ -41,6 +41,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Conflict", message: "Match is already finalized." }, { status: 409 });
     }
 
+    // 3.5 — SERVER-AUTHORITATIVE DEADLINE: Ensure the 15-minute match window has actually elapsed
+    const matchDurationMs = 15 * 60 * 1000;
+    const startedAt = match.startedAt || match.createdAt || 0;
+    if (startedAt && (Date.now() - startedAt < matchDurationMs)) {
+      return NextResponse.json(
+        { error: "Match deadline has not elapsed yet. Server-authoritative timer prevents premature timeout." },
+        { status: 400 }
+      );
+    }
+
     // 4 — DETERMINE WINNER BASED ON PARTIAL PROGRESS
     const p1 = match.player1;
     const p2 = match.player2;

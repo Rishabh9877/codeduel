@@ -102,9 +102,12 @@ export const SEED_CHALLENGES: Record<string, Challenge> = {
 High-priority triage ticket from API Gateway Security.
 Unescaped special characters in redirect parameters bypass ingress validation.
 
-**Root Cause:** In \`sanitize.ts\`, query parameters are formatted via raw string template interpolation without \`encodeURIComponent\`. Values containing \`&\` or \`=\` split downstream parameters.
+#### Description
+When user inputs containing special delimiter characters (such as \`&\` or \`=\`) are passed into \`buildQueryString()\`, downstream services misinterpret the key-value structure and process unintended parameters.
 
-**Fix Required:** Properly encode both query parameter keys and values using \`encodeURIComponent\`.`,
+#### Acceptance Criteria
+1. Ensure query parameters are properly encoded so special characters like \`&\` and \`=\` do not split or corrupt downstream parameter parsing.
+2. All unit tests pass without errors.`,
     entrypoint: 'runner.ts',
     totalTests: 3,
     files: [
@@ -123,7 +126,6 @@ Unescaped special characters in redirect parameters bypass ingress validation.
 
 export function buildRedirectUrl(baseUrl: string, params: QueryParam[]): string {
   if (!params.length) return baseUrl;
-  // BUG: Direct string interpolation without encodeURIComponent
   const query = params.map(p => \`\${p.key}=\${p.value}\`).join('&');
   return \`\${baseUrl}?\${query}\`;
 }`
@@ -195,9 +197,9 @@ process.exit(passed === total ? 0 : 1);
 
 Users report sporadic HTTP 429 errors during concurrent bursts.
 
-**Root Cause:** In \`rateLimiter.ts\`, the token regeneration logic calculates elapsed time using \`Math.floor((now - lastRefill) / 1000)\`. Fractional seconds are truncated to zero, causing the bucket to never replenish between high-frequency bursts under 1 second.
-
-**Fix Required:** Calculate precise fractional milliseconds refill or accumulate residual milliseconds properly.`,
+#### Acceptance Criteria
+1. Ensure token replenishment operates smoothly during sub-second request bursts.
+2. Maintain bucket capacity limits and refill rates accurately across all test cases.`,
     entrypoint: 'runner.ts',
     totalTests: 3,
     files: [
@@ -223,7 +225,6 @@ export class TokenBucketLimiter {
 
   consume(tokensRequested: number = 1): boolean {
     const now = Date.now();
-    // BUG: Truncating to integer seconds drops fractional refills
     const elapsedSeconds = Math.floor((now - this.state.lastRefillMs) / 1000);
     
     if (elapsedSeconds > 0) {
@@ -332,9 +333,9 @@ else process.exit(1);`
 
 High-speed serial frames (115200 baud) are dropping bytes during RX FIFO buffer wrap-around.
 
-**Root Cause:** In \`ring_buffer.c\`, the condition for \`rb_is_full\` checks \`head == tail\`, which collides with the \`rb_is_empty\` state. Furthermore, write pointer incrementation fails to wrap around using the buffer mask.
-
-**Fix Required:** Fix pointer calculation and ensure full vs. empty state detection preserves FIFO integrity.`,
+#### Acceptance Criteria
+1. Correct circular buffer indexing and capacity tracking so full and empty states are reliably distinguished.
+2. Prevent packet corruption and preserve FIFO ordering during continuous enqueue/dequeue cycles.`,
     entrypoint: 'test_runner.c',
     totalTests: 3,
     files: [
@@ -376,7 +377,6 @@ void rb_init(RingBuffer *rb) {
 }
 
 bool rb_is_full(const RingBuffer *rb) {
-    // BUG: Confusing full with empty state
     return (rb->head == rb->tail);
 }
 
@@ -387,7 +387,6 @@ bool rb_is_empty(const RingBuffer *rb) {
 bool rb_write(RingBuffer *rb, uint8_t data) {
     if (rb_is_full(rb)) return false;
     rb->buffer[rb->head] = data;
-    // BUG: Missing modulo/mask wrap-around
     rb->head++; 
     rb->count++;
     return true;
@@ -489,9 +488,9 @@ int main() {
 
 During upstream network blips, client retries trigger instant retry cascades instead of waiting.
 
-**Root Cause:** In \`backoff.ts\`, the full jitter calculation subtracts a fixed offset without lower bound clamping. When \`attempt = 0\` and \`baseDelayMs = 100\`, subtracting up to 1000ms causes delays to compute as negative numbers, firing retries instantly.
-
-**Fix Required:** Ensure retry delay is strictly non-negative and bounded within the jitter envelope.`,
+#### Acceptance Criteria
+1. Ensure calculated retry delays are non-negative and strictly bounded within the configured jitter envelope.
+2. Backoff must scale exponentially with attempts up to maxDelayMs.`,
     entrypoint: 'runner.ts',
     totalTests: 3,
     files: [
@@ -510,7 +509,6 @@ During upstream network blips, client retries trigger instant retry cascades ins
 
 export function computeRetryDelay(attempt: number, config: BackoffConfig): number {
   const exponentialCap = Math.min(config.maxDelayMs, config.baseDelayMs * Math.pow(2, attempt));
-  // BUG: Subtracting fixed random offset produces negative or zero delays on early attempts
   const delay = exponentialCap - Math.random() * 1000;
   return delay;
 }`
@@ -613,9 +611,9 @@ else process.exit(1);`
 
 Tactile pushbutton presses generate intermittent noisy pulses (5-15ms bounce).
 
-**Root Cause:** In \`gpio_debounce.c\`, the state validator commits state transitions on every pin event without checking whether \`elapsed_ms >= DEBOUNCE_THRESHOLD_MS\`.
-
-**Fix Required:** Filter transient oscillations until the signal remains stable past the threshold window before toggling \`stable_state\`.`,
+#### Acceptance Criteria
+1. Accurately filter transient contact oscillations so state transitions commit only after the signal stabilizes for the threshold duration.
+2. Pass all debounce validation tests.`,
     entrypoint: 'test_runner.c',
     totalTests: 3,
     files: [
@@ -659,8 +657,6 @@ bool debouncer_update(Debouncer *d, bool raw_sample, uint32_t current_time_ms) {
         d->last_raw_sample = raw_sample;
         d->last_transition_ms = current_time_ms;
     }
-
-    // BUG: Immediately updates stable_state without waiting for threshold
     if (raw_sample != d->stable_state) {
         d->stable_state = raw_sample;
         return true;
@@ -746,12 +742,9 @@ int main() {
 
 Security audits detected that an attacker can forge admin JWT tokens by supplying \`{"alg": "none"}\` or casing variants (\`{"alg": "NONE"}\`), completely skipping signature verification.
 
-**Root Cause:** In \`verifier.ts\`, the verifier checks \`if (header.alg === "none")\` without normalizing to uppercase, and fails to reject tokens whose algorithm is not in \`options.allowedAlgorithms\`.
-
-**Fix Required:** 
-1. Always normalize the algorithm name (case-insensitive check).
-2. If \`options.allowedAlgorithms\` is provided, reject any token with an algorithm not explicitly listed.
-3. Tokens with \`alg: "none"\` must NEVER be accepted unless \`"NONE"\` is explicitly in \`options.allowedAlgorithms\`.`,
+#### Acceptance Criteria
+1. Reject tokens with unauthorized or unsecure algorithms, including algorithm casing variations.
+2. Ensure token verification strictly adheres to allowed algorithm configurations.`,
     entrypoint: 'runner.ts',
     totalTests: 3,
     files: [
@@ -809,9 +802,6 @@ export function verifyToken(
   } catch (e) {
     return { valid: false, error: 'Invalid JSON encoding' };
   }
-
-  // BUG: Direct string comparison without case normalization allows "NONE" or "None" bypass.
-  // BUG: Does not enforce options.allowedAlgorithms.
   if (header.alg === 'none') {
     return { valid: true, payload };
   }
@@ -911,9 +901,9 @@ else process.exit(1);`
 
 During peak traffic, sporadic upstream database timeouts or syntax errors leave connection handles allocated, reducing available connections to zero.
 
-**Root Cause:** In \`pool.ts\`, \`withConnection(fn)\` acquires a client handle, awaits \`fn(conn)\`, and only releases the connection upon successful resolution. When \`fn\` throws or rejects, \`release(conn)\` is skipped, leaking the connection.
-
-**Fix Required:** Wrap the query execution in a \`try...finally\` block so that the acquired connection is unconditionally returned to the idle pool regardless of success or failure.`,
+#### Acceptance Criteria
+1. Ensure connection handles are reliably returned to the idle pool under both successful execution and thrown errors/rejections.
+2. Prevent connection leaks under simulated database query errors.`,
     entrypoint: 'runner.ts',
     totalTests: 3,
     files: [
@@ -966,7 +956,6 @@ export class ConnectionPool {
 
   async withConnection<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {
     const conn = this.acquire();
-    // BUG: Missing try/finally block. If fn() throws, conn is never released.
     const result = await fn(conn);
     this.release(conn);
     return result;
@@ -1067,12 +1056,9 @@ run();`
 
 When a hot cache key expires, 50+ concurrent HTTP handlers simultaneously encounter a cache miss and each invoke the expensive upstream database query (Thundering Herd problem).
 
-**Root Cause:** In \`cache.ts\`, \`SingleFlightCache.getOrFetch\` checks whether the key exists in memory. If not, it directly invokes the \`fetcher()\` for each caller without deduplicating requests via an in-flight promise map.
-
-**Fix Required:** 
-1. Maintain an \`inFlight: Map<string, Promise<T>>\` of active fetch promises.
-2. If an identical key is already being fetched, return the existing in-flight promise instead of launching a new fetch.
-3. Once the promise resolves or rejects, remove it from \`inFlight\`.`,
+#### Acceptance Criteria
+1. Deduplicate concurrent requests for identical keys so only a single upstream fetch is executed while in-flight.
+2. Correctly cache and propagate the fetched value to all concurrent callers.`,
     entrypoint: 'runner.ts',
     totalTests: 3,
     files: [
@@ -1100,8 +1086,6 @@ export class SingleFlightCache<T> {
     if (entry && entry.expiresAt > Date.now()) {
       return entry.value;
     }
-
-    // BUG: Missing SingleFlight promise coalescing.
     // Every concurrent caller invokes fetcher() instead of sharing an inFlight promise!
     const value = await fetcher();
     this.cache.set(key, { value, expiresAt: Date.now() + this.ttlMs });
@@ -1242,11 +1226,9 @@ run();`
 
 Telemetry downlink shows erratic readings and positive overflow when the drone tilts in the negative axis direction.
 
-**Root Cause:** In \`imu_driver.c\`, \`imu_parse_axis\` unpacks 16-bit register bytes using little-endian \`(lsb << 8) | msb\` instead of the sensor's big-endian wire format \`(msb << 8) | lsb\`. Furthermore, it performs unsigned bit shifts without casting to signed \`int16_t\`, converting negative values (e.g. -200) into huge positive numbers (e.g. 65336).
-
-**Fix Required:** 
-1. Reconstruct the 16-bit word as big-endian: \`((uint16_t)msb << 8) | (uint16_t)lsb\`.
-2. Properly cast the result to signed \`int16_t\` to preserve two's complement sign extension.`,
+#### Acceptance Criteria
+1. Accurately unpack 16-bit sensor telemetry according to the hardware wire protocol.
+2. Preserve signed integer representations across negative acceleration values.`,
     entrypoint: 'test_runner.c',
     totalTests: 3,
     files: [
@@ -1276,8 +1258,6 @@ bool imu_decode_packet(const uint8_t *raw_6byte_packet, imu_sample_t *out);
         content: `#include "imu_driver.h"
 
 int16_t imu_parse_axis(uint8_t msb, uint8_t lsb) {
-    // BUG: Reversed byte order (little-endian instead of big-endian)
-    // BUG: Unsigned representation drops two's complement sign
     uint16_t raw = (lsb << 8) | msb;
     return (int16_t)raw;
 }
@@ -1372,11 +1352,9 @@ int main() {
 
 BLDC motor controller emits high-pitched whine and vibrates violently due to PWM frequency deviating from target 20 kHz.
 
-**Root Cause:** In \`pwm_timer.c\`, the prescaler calculation uses \`(clk / (target_freq * arr))\` instead of the ARM Cortex-M hardware register formula \`(clk / (target_freq * (arr + 1))) - 1\`. Furthermore, \`pwm_duty_to_ccr\` does not clamp duty cycle percentages above 100%, causing register overflow.
-
-**Fix Required:** 
-1. Use the exact hardware formula: \`(uint16_t)((timer_clk_hz / (target_freq_hz * (arr + 1))) - 1)\`.
-2. Clamp \`duty_percent\` to a maximum of 100 before computing \`(duty * arr) / 100\`.`,
+#### Acceptance Criteria
+1. Correctly compute timer prescaler and auto-reload values matching target PWM frequency.
+2. Clamp and calculate compare register values safely to prevent duty cycle overflow.`,
     entrypoint: 'test_runner.c',
     totalTests: 3,
     files: [
@@ -1401,13 +1379,11 @@ uint16_t pwm_duty_to_ccr(uint8_t duty_percent, uint16_t arr);
 
 uint16_t pwm_calculate_prescaler(uint32_t timer_clk_hz, uint32_t target_freq_hz, uint16_t arr) {
     if (target_freq_hz == 0 || arr == 0) return 0;
-    // BUG: Missing (arr + 1) and missing - 1 register offset
     uint32_t div = timer_clk_hz / (target_freq_hz * arr);
     return (uint16_t)div;
 }
 
 uint16_t pwm_duty_to_ccr(uint8_t duty_percent, uint16_t arr) {
-    // BUG: Does not clamp duty_percent > 100
     return (uint16_t)(((uint32_t)duty_percent * arr) / 100);
 }`
       },
@@ -1486,9 +1462,9 @@ int main() {
 
 Worker nodes running high-throughput stream consumer pods encounter connection pool exhaustion after catching payload validation exceptions.
 
-**Root Cause:** In \`stream_worker.py\`, \`process_batch\` creates a connection handle for the batch. If any record raises a processing error, the exception escapes without closing the connection (\`conn.close()\`), leaving the socket handle hanging in the active pool.
-
-**Fix Required:** Wrap the batch iteration in a \`try...finally\` block to ensure \`conn.close()\` is unconditionally called even when an exception is raised or handled.`,
+#### Acceptance Criteria
+1. Ensure connection handles are properly closed and cleaned up even when batch record processing raises an error.
+2. Prevent file descriptor and socket exhaustion across all test scenarios.`,
     entrypoint: 'test_runner.py',
     totalTests: 3,
     files: [
@@ -1640,13 +1616,12 @@ else:
 
 #### Description
 When telemetry packets stream at high data rates (> 1 kHz), the main system loop in \`telemetry_wait_for_packets()\` frequently fails to observe packet count increments and trips the hardware watchdog timer (WDT).
-Disassembly analysis reveals that GCC/Clang with \`-O2\` optimization hoists the read of \`packet_count\` out of the loop into register \`r3\`, never re-fetching the updated value from SRAM after the ISR triggers!
 
-Furthermore, atomic snapshots in \`telemetry_get_stats_atomic()\` occasionally yield corrupted 64-bit timestamps due to torn reads when the ISR fires between reading the upper and lower 32-bit words.
+Furthermore, atomic snapshots in \`telemetry_get_stats_atomic()\` occasionally yield corrupted 64-bit timestamps during concurrent ISR activity.
 
 #### Acceptance Criteria
-1. Mark shared ISR variables as \`volatile\` so the compiler emits an \`LDR\` instruction on every iteration.
-2. Protect multi-word timestamp reads inside a critical section that saves and restores the \`PRIMASK\` state.
+1. Ensure the polling loop reliably observes packet count increments under compiler optimization.
+2. Protect multi-word telemetry reads from torn reads caused by asynchronous ISR execution while properly managing interrupt state.
 3. Pass all 3 unit tests without triggering watchdog timeouts.`,
     entrypoint: 'test_runner.c',
     totalTests: 3,
@@ -1695,8 +1670,6 @@ bool telemetry_wait_for_packets(uint32_t target_count, uint32_t timeout_loops);
         content: `#include "telemetry.h"
 #include "registers.h"
 #include <string.h>
-
-// BUG: Missing volatile keyword! Compiler hoists variable into register at -O2.
 static uint32_t packet_count = 0;
 static uint32_t dropped_packets = 0;
 static uint64_t last_timestamp_us = 0;
@@ -1718,7 +1691,6 @@ void telemetry_isr_handler(uint64_t timestamp_us) {
 
 telemetry_stats_t telemetry_get_stats_atomic(void) {
   telemetry_stats_t stats;
-  // BUG: Does not disable interrupts! 64-bit timestamp is subject to torn reads.
   stats.packet_count = packet_count;
   stats.dropped_packets = dropped_packets;
   stats.last_timestamp_us = last_timestamp_us;
@@ -1847,11 +1819,10 @@ int main(void) {
 
 #### Description
 During vehicle test drives, the CAN gateway node periodically halts with an unhandled \`HardFault_Handler\` interrupt.
-The crash occurs inside \`parse_uint16_safe()\` and \`parse_uint32_safe()\`.
-Unlike Cortex-M3/M4, the ARM Cortex-M0 architecture **does not support unaligned memory access**. Dereferencing a 16-bit word pointer at an odd byte offset (e.g. \`offset = 1\`) or a 32-bit word pointer at non-multiple-of-4 address (e.g. \`offset = 3\`) generates an immediate bus fault.
+The crash occurs inside \`parse_uint16_safe()\` and \`parse_uint32_safe()\` when parsing incoming CAN OBD-II frames on the ARM Cortex-M0 microcontroller.
 
 #### Acceptance Criteria
-1. Re-implement \`parse_uint16_safe()\` and \`parse_uint32_safe()\` using byte-safe extraction (e.g. \`memcpy\` or bitwise shifts) to avoid unaligned pointer dereferencing.
+1. Ensure 16-bit and 32-bit multi-byte extraction from raw byte buffers is memory-safe on Cortex-M0 hardware.
 2. In \`parse_obd2_frame()\`, ensure frames with \`dlc < 8\` are marked \`valid = false\`.
 3. Pass all 3 automated unit tests.`,
     entrypoint: 'test_runner.c',
@@ -1915,8 +1886,6 @@ obd2_telemetry_t parse_obd2_frame(const can_raw_frame_t *frame);
         content: `#include "can_parser.h"
 #include "registers.h"
 #include <string.h>
-
-// BUG: Direct pointer cast causes HardFault on Cortex-M0 when offset is unaligned!
 uint16_t parse_uint16_safe(const uint8_t *buffer, uint8_t offset) {
   return *(const uint16_t *)(buffer + offset);
 }
@@ -1933,8 +1902,6 @@ obd2_telemetry_t parse_obd2_frame(const can_raw_frame_t *frame) {
     tel.valid = false;
     return tel;
   }
-
-  // BUG: Does not check dlc < 8
   tel.rpm = parse_uint16_safe(frame->data, 1);
   tel.odometer_km = parse_uint32_safe(frame->data, 3);
   tel.coolant_temp = frame->data[7];

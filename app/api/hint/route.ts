@@ -303,12 +303,14 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
         // Refund the reservation if the Gemini call fails in match mode
         if (!isSoloPractice && match) {
           try {
+            // Refund the reservation with condition so hintsUsed never goes below 0
             await dynamo.send(
               new UpdateCommand({
                 TableName: TABLE,
                 Key: { PK: `MATCH#${matchId}`, SK: "META" },
                 UpdateExpression: `SET ${myRole}.hintsUsed = ${myRole}.hintsUsed - :one`,
-                ExpressionAttributeValues: { ":one": 1 },
+                ConditionExpression: `attribute_exists(${myRole}.hintsUsed) AND ${myRole}.hintsUsed > :zero`,
+                ExpressionAttributeValues: { ":one": 1, ":zero": 0 },
               })
             );
             hintsUsed = Math.max(0, hintsUsed - 1);
