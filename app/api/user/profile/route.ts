@@ -158,7 +158,7 @@ export async function GET() {
     for (let i = 0; i < chronological.length; i++) {
       const m = chronological[i];
       const isWin = m.winnerId === userId;
-      const eloAfter = isWin ? (m.newWinnerElo ?? (rollingElo + 16)) : (m.newLoserElo ?? Math.max(600, rollingElo - 16));
+      const eloAfter = isWin ? (m.newWinnerElo ?? (rollingElo + 16)) : (m.newLoserElo ?? Math.max(800, rollingElo - 16));
       rollingElo = eloAfter;
       const d = new Date(m.finishedAt ?? m.startedAt ?? Date.now());
       eloHistory.push({

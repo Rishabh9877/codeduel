@@ -128,8 +128,7 @@ export async function getCohortByCode(code: string, currentUserId?: string) {
         createdAt: demoCohort!.createdAt,
         studentCount: demoCohort!.studentCount,
         assignmentsCount: demoCohort!.assignmentsCount,
-        // Only mark as demo if there's no authenticated user (guest preview)
-        ...(currentUserId ? {} : { isDemo: true }),
+        isDemo: true,
       };
 
   // Fetch assignments

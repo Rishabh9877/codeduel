@@ -70,7 +70,7 @@ export async function GET() {
       const isWin = m.winnerId === userId;
       rollingElo = isWin
         ? Number(m.newWinnerElo ?? (rollingElo + 16))
-        : Number(m.newLoserElo ?? Math.max(600, rollingElo - 16));
+        : Number(m.newLoserElo ?? Math.max(800, rollingElo - 16));
       eloHistory.push({
         played_at: new Date(m.finishedAt ?? m.startedAt ?? Date.now()).toISOString(),
         elo: rollingElo,

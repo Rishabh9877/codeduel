@@ -35,6 +35,7 @@ export default function FriendsPage() {
   const [msg, setMsg] = useState<{ text: string; type: "err" | "success" } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<{ id: string, username: string } | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [isFriendsDisabled, setIsFriendsDisabled] = useState(false);
   const [isLoaded, setIsLoaded] = useState(() => {
     if (typeof window !== "undefined") return !!localStorage.getItem("friends_friends");
     return false;
@@ -45,6 +46,10 @@ export default function FriendsPage() {
       const r = await fetch("/api/friends");
       if (r.ok) {
         const d = await r.json();
+        if (d.enabled === false) {
+          setIsFriendsDisabled(true);
+          return;
+        }
         if (!d.error) {
           setFriends(d.friends || []);
           localStorage.setItem("friends_friends", JSON.stringify(d.friends || []));
@@ -428,6 +433,45 @@ export default function FriendsPage() {
       <div className="main-col">
         <h1 style={{ fontSize: 24, marginBottom: 20 }}>Friends</h1>
 
+        {isFriendsDisabled ? (
+          <div
+            style={{
+              background: "rgba(244,63,94,0.06)",
+              border: "1px solid rgba(244,63,94,0.25)",
+              borderRadius: 12,
+              padding: "36px 24px",
+              textAlign: "center",
+              marginBottom: 30,
+            }}
+          >
+            <div style={{ fontSize: 36, marginBottom: 12 }}>⚡</div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#f43f5e", marginBottom: 8 }}>
+              Friends Subsystem Unavailable in Dynamo-Only Mode
+            </h2>
+            <p style={{ fontSize: 13, color: "var(--muted2)", lineHeight: 1.6, maxWidth: 520, margin: "0 auto" }}>
+              The peer connections graph and direct friend invitations require a relational PostgreSQL database connection (<code>DATABASE_URL</code>).
+              CodeDuel is currently running on the DynamoDB backend.
+            </p>
+            <div style={{ marginTop: 20 }}>
+              <button
+                onClick={() => router.push("/dashboard")}
+                style={{
+                  padding: "10px 20px",
+                  background: "var(--primary)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Return to Matchmaking
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* ADD FRIEND */}
         <div className="card">
           <div className="card-hdr">Add a Friend</div>
@@ -575,6 +619,8 @@ export default function FriendsPage() {
             ))
           )}
         </div>
+        </>
+        )}
       </div>
     </>
   );

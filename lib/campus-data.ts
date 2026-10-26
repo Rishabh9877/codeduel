@@ -17,6 +17,10 @@ export interface CohortStudent {
   enrolledAt: string;
   role: "STUDENT" | "TA" | "FACULTY";
   completedAssignmentsCount: number;
+  integrityScore?: number;
+  tabSwitches?: number;
+  externalPastes?: number;
+  proctorStatus?: string;
 }
 
 export interface CohortSubmission {
@@ -111,9 +115,9 @@ export const SEEDED_COHORTS: Array<
       },
     ],
     students: [
-      { userId: "demo_stu_1", username: "aarav_sharma", avatar: null, elo: 1340, enrolledAt: "2026-09-02T10:00:00.000Z", role: "STUDENT", completedAssignmentsCount: 4 },
-      { userId: "demo_stu_2", username: "priya_sundaram", avatar: null, elo: 1290, enrolledAt: "2026-09-02T11:15:00.000Z", role: "STUDENT", completedAssignmentsCount: 4 },
-      { userId: "demo_stu_3", username: "neha_patel", avatar: null, elo: 1210, enrolledAt: "2026-09-02T12:00:00.000Z", role: "STUDENT", completedAssignmentsCount: 3 },
+      { userId: "demo_stu_1", username: "aarav_sharma", avatar: null, elo: 1340, enrolledAt: "2026-09-02T10:00:00.000Z", role: "STUDENT", completedAssignmentsCount: 4, integrityScore: 100, tabSwitches: 0, externalPastes: 0, proctorStatus: "100% Verified (0 Pastes, 0 Tab Switches)" },
+      { userId: "demo_stu_2", username: "priya_sundaram", avatar: null, elo: 1290, enrolledAt: "2026-09-02T11:15:00.000Z", role: "STUDENT", completedAssignmentsCount: 4, integrityScore: 98, tabSwitches: 0, externalPastes: 0, proctorStatus: "98% Verified (0 Pastes, 0 Tab Switches)" },
+      { userId: "demo_stu_3", username: "neha_patel", avatar: null, elo: 1210, enrolledAt: "2026-09-02T12:00:00.000Z", role: "STUDENT", completedAssignmentsCount: 3, integrityScore: 65, tabSwitches: 3, externalPastes: 1, proctorStatus: "Flagged (3 Tab Switches)" },
       { userId: "demo_stu_4", username: "kabir_mehta", avatar: null, elo: 1180, enrolledAt: "2026-09-03T09:30:00.000Z", role: "STUDENT", completedAssignmentsCount: 3 },
       { userId: "demo_stu_5", username: "ishaan_joshi", avatar: null, elo: 1150, enrolledAt: "2026-09-03T14:20:00.000Z", role: "STUDENT", completedAssignmentsCount: 3 },
       { userId: "demo_stu_6", username: "rohan_verma", avatar: null, elo: 1120, enrolledAt: "2026-09-04T08:45:00.000Z", role: "STUDENT", completedAssignmentsCount: 3 },

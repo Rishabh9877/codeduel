@@ -7,7 +7,7 @@
 // =============================================================================
 
 export const DEFAULT_K_FACTOR = 32;
-export const DEFAULT_RATING_FLOOR = 600;
+export const DEFAULT_RATING_FLOOR = 800;
 export const STARTING_ELO = 1000;
 
 export interface RankTier {

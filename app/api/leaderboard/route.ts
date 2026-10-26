@@ -26,14 +26,21 @@ export async function GET() {
       })
     );
 
-    const rawItems: any[] = result.Items ?? [];
+    const isProduction = process.env.NODE_ENV === "production";
+    let rawItems: any[] = result.Items ?? [];
 
-    // If current logged-in user is not in the list, fetch their profile and merge them in
-    if (currentUserId && !rawItems.some((i) => i.userId === currentUserId)) {
+    // In production, guests must NEVER appear on the global leaderboard
+    if (isProduction) {
+      rawItems = rawItems.filter((i) => !i.userId?.startsWith("guest_") && !i.isGuest);
+    }
+
+    // If current logged-in user is not in the list, fetch their profile and merge them in (unless guest in production)
+    const isCurrentGuest = currentUserId?.startsWith("guest_");
+    if (currentUserId && (!isProduction || !isCurrentGuest) && !rawItems.some((i) => i.userId === currentUserId)) {
       const userProf = await dynamo.send(
         new GetCommand({ TableName: TABLE, Key: { PK: `USER#${currentUserId}`, SK: "PROFILE" } })
       );
-      if (userProf.Item) {
+      if (userProf.Item && (!isProduction || !userProf.Item.isGuest)) {
         rawItems.push({
           userId: currentUserId,
           username: userProf.Item.username ?? session?.user?.name ?? "Developer",

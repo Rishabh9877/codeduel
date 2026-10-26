@@ -282,6 +282,18 @@ export async function GET(
     return NextResponse.json({ error: "Challenge not found" }, { status: 404 });
   }
 
+  // Sanitize player payloads: opponent's code/patch is strictly hidden while match is active
+  const sanitizePlayer = (p: any, isMe: boolean) => {
+    if (!p) return p;
+    if (isMe || match.status === "finished" || match.status === "forfeited") {
+      return p;
+    }
+    const { currentCode, userFiles, files, patch, submittedCode, ...safePlayer } = p;
+    return safePlayer;
+  };
+
+  const isMatchOver = match.status === "finished" || match.status === "forfeited";
+
   return NextResponse.json({
     match: {
       matchId:    match.matchId,
@@ -290,8 +302,8 @@ export async function GET(
       finishedAt: match.finishedAt ?? null,
       winnerId:   match.winnerId   ?? null,
       endedBy:    match.endedBy    ?? null,
-      player1:    match.player1,
-      player2:    match.player2,
+      player1:    sanitizePlayer(match.player1, myRole === "player1"),
+      player2:    sanitizePlayer(match.player2, myRole === "player2"),
       newWinnerElo: match.newWinnerElo ?? null,
       newLoserElo:  match.newLoserElo ?? null,
     },
@@ -307,8 +319,9 @@ export async function GET(
       totalTests: challenge.totalTests,
       hardwareContext: challenge.hardwareContext,
       hiddenTestsCount: challenge.hiddenTestsCount,
-      // SECURITY: Only reveal walkthrough if match is finalized to prevent live duel cheating
-      walkthrough: match.status === "finished" ? challenge.walkthrough : null,
+      // SECURITY: Post-mortem walkthrough and solutions are strictly NULL until match has concluded
+      walkthrough: isMatchOver ? challenge.walkthrough : null,
+      canonicalSolution: isMatchOver ? challenge.canonicalSolution ?? null : null,
     },
     myRole,
   }, {

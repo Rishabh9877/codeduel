@@ -13,7 +13,6 @@
 
 import type { Challenge, ChallengeFile } from './challenges';
 import ts from 'typescript';
-import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -426,7 +425,23 @@ export async function executeChallenge(
     }
   }
 
-  // 5. Built-in Fallback Execution
+  // 5. Built-in Fallback Execution (Development Only)
+  // SECURITY: Local fallback is strictly blocked in production unless explicitly enabled via ENABLE_LOCAL_CODE_EXECUTION=true
+  const isProduction = process.env.NODE_ENV === "production";
+  const allowLocalFallback = process.env.ENABLE_LOCAL_CODE_EXECUTION === "true" || !isProduction;
+
+  if (!allowLocalFallback) {
+    return {
+      passed: 0,
+      total: challenge.totalTests,
+      allPassed: false,
+      stdout: '',
+      stderr: 'Sandboxed code execution service is currently unavailable. Local fallback execution on the app host is disabled in production environments for security.',
+      runtimeMs: 0,
+      status: 'execution_service_unavailable',
+      testResults: [],
+    };
+  }
   if (challenge.language === 'typescript') {
     return await executeTypeScriptLocally(mergedFiles, challenge.entrypoint, challenge.totalTests);
   }

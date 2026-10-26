@@ -19,6 +19,19 @@ export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Friends relational graph requires PostgreSQL. When running in a Dynamo-only configuration,
+  // notify the client that the friends subsystem is disabled rather than silently returning empty.
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({
+      enabled: false,
+      error: "Friends system is unavailable: requires PostgreSQL database (DATABASE_URL is unset in Dynamo-only mode).",
+      friends: [],
+      pendingSent: [],
+      pendingReceived: [],
+      incomingChallenges: [],
+    });
+  }
+
   const userId = ((session.user as any).id || (session.user as any).sub) as string;
 
   try {
@@ -93,6 +106,13 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: "Friends system is unavailable: requires PostgreSQL database (DATABASE_URL unset in Dynamo-only mode)." },
+      { status: 503 }
+    );
+  }
 
   const userId = ((session.user as any).id || (session.user as any).sub) as string;
 

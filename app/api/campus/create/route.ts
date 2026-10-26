@@ -24,16 +24,19 @@ export async function POST(req: Request) {
     );
     const userRole = profileRes.Item?.role || (session.user as any).role || "INDIVIDUAL";
     const isAdmin = userRole === "ADMIN";
-    const userEmail = session.user.email || "";
-    const isAcademicEmail = userEmail.endsWith(".edu") || userEmail.endsWith(".ac.in");
-    const expectedPasscode = (process.env.FACULTY_SECRET || "CODEDUEL-FACULTY-2026").toUpperCase();
-    const isPasscodeValid = facultyPasscode && facultyPasscode.trim().toUpperCase() === expectedPasscode;
+    const expectedPasscode = process.env.FACULTY_SECRET ? process.env.FACULTY_SECRET.trim().toUpperCase() : null;
+    const isPasscodeValid = Boolean(
+      expectedPasscode &&
+      facultyPasscode &&
+      facultyPasscode.trim().toUpperCase() === expectedPasscode
+    );
 
-    if (!isAdmin && userRole !== "FACULTY" && !isAcademicEmail && !isPasscodeValid) {
+    // .edu email alone does NOT grant faculty; must be existing verified FACULTY/ADMIN or supply valid FACULTY_SECRET
+    if (!isAdmin && userRole !== "FACULTY" && !isPasscodeValid) {
       return NextResponse.json(
         {
           error:
-            "Access Denied: Only verified faculty instructors can create university course cohorts. Please provide a valid Faculty Verification Key or switch to a verified instructor account.",
+            "Access Denied: Only verified faculty instructors can create university course cohorts. Please provide a valid Faculty Verification Key from your department administrator.",
         },
         { status: 403 }
       );

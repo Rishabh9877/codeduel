@@ -32,7 +32,7 @@ Be concise, technical, warm, and encouraging.
 Respond with plain text only — no markdown headers, no bullet points, and at most short inline code keywords if strictly necessary.`;
 
 // Hard guardrail: Coach NEVER gives code solutions.
-// Strips accidental multi-line code blocks from Gemini responses to enforce Socratic pedagogy.
+// Strips accidental multi-line code blocks and multi-statement inline code from Gemini responses to enforce Socratic pedagogy.
 function sanitizeHint(text: string, fallback?: string): string {
   if (!text) return fallback || "";
 
@@ -49,7 +49,20 @@ function sanitizeHint(text: string, fallback?: string): string {
     return match;
   });
 
-  // 3. Fallback if the response was entirely a code block
+  // 3. Strip inline code snippets that contain more than one statement, compound constructs, or lengthy code
+  cleaned = cleaned.replace(/`([^`]+)`/g, (match, innerCode) => {
+    const trimmed = innerCode.trim();
+    const semicolonCount = (trimmed.match(/;/g) || []).length;
+    const hasBraces = /[{}]/.test(trimmed);
+    const hasMultiStatement =
+      semicolonCount > 1 || (semicolonCount >= 1 && (hasBraces || /\b(if|for|while|return)\b/.test(trimmed)));
+    if (hasMultiStatement || trimmed.length > 50) {
+      return "[code statement stripped for Socratic evaluation]";
+    }
+    return match;
+  });
+
+  // 4. Fallback if the response was entirely a code block
   if (cleaned.trim().length < 15 && fallback) {
     return fallback;
   }
@@ -64,13 +77,15 @@ const FALLBACK_HINTS = [
   "Verify boundary wrap-around masking and state clamping before decrementing or incrementing pointers.",
 ];
 
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+import { checkRateLimitDb, getClientIp, getActionRateLimit } from "@/lib/rateLimit";
 
-function checkRateLimit(key: string, limit = 12, windowMs = 60000): boolean {
+const userRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(map: Map<string, { count: number; resetAt: number }>, key: string, limit = 12, windowMs = 60000): boolean {
   const now = Date.now();
-  const entry = rateLimitMap.get(key);
+  const entry = map.get(key);
   if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+    map.set(key, { count: 1, resetAt: now + windowMs });
     return true;
   }
   if (entry.count >= limit) {
@@ -81,28 +96,31 @@ function checkRateLimit(key: string, limit = 12, windowMs = 60000): boolean {
 }
 
 export async function POST(req: Request) {
-  const forwarded = req.headers.get("x-forwarded-for");
-  const clientIp = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+  const clientIp = getClientIp(req);
 
   const body = await req.json();
   const { matchId, challengeId, currentCode, language, activeFileName, practice, practiceTier } = body;
 
-  const isSoloPractice = practice || matchId === "practice" || matchId?.startsWith("practice-");
-
   const session = await getServerSession(authOptions);
-  if (!isSoloPractice && !session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const userId = session?.user
-    ? (((session.user as any).id || (session.user as any).sub) as string)
+    ? ((session.user as any).id || (session.user as any).userId || (session.user as any).sub)
     : "guest_practice";
 
-  // Rate limiting guard
-  const rateKey = `hint_${userId}_${clientIp}`;
-  if (!checkRateLimit(rateKey, 15, 60000)) {
+  const isSoloPractice = practice || matchId === "practice" || matchId?.startsWith("practice-");
+
+  // Distributed database-backed rate limit by IP (works across serverless lambdas), configurable & elevated in DEMO_MODE
+  const maxHintsRate = getActionRateLimit(isSoloPractice ? "hint_solo" : "hint_match", 15);
+  const ipRl = await checkRateLimitDb(isSoloPractice ? "hint_solo_ip" : "hint_match_ip", clientIp, maxHintsRate, 60);
+  if (!ipRl.allowed) {
     return NextResponse.json(
-      { error: "Rate limit exceeded: You are requesting hints too rapidly. Please pause for 60 seconds." },
+      { error: "Rate limit exceeded: You are requesting hints too rapidly from this IP. Please pause for 60 seconds." },
+      { status: 429 }
+    );
+  }
+
+  if (userId && !checkRateLimit(userRateLimitMap, `user_${userId}`, 5, 60000)) {
+    return NextResponse.json(
+      { error: "Per-user rate limit exceeded: Maximum 5 hint requests per minute allowed." },
       { status: 429 }
     );
   }
@@ -122,7 +140,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "matchId is required" }, { status: 400 });
     }
 
-    // Fetch match to verify auth + get current hint count
+    // Fetch match to verify auth + role
     const matchResult = await dynamo.send(
       new GetCommand({
         TableName: TABLE,
@@ -143,17 +161,47 @@ export async function POST(req: Request) {
     }
 
     myRole = isPlayer1 ? "player1" : "player2";
-    hintsUsed = (match[myRole].hintsUsed ?? 0) as number;
+    const currentHints = (match[myRole].hintsUsed ?? 0) as number;
 
-    if (hintsUsed >= MAX_HINTS) {
+    if (currentHints >= MAX_HINTS) {
       return NextResponse.json(
-        { error: "No hints remaining", hintsUsed },
+        { error: "No hints remaining: You have reached the maximum 3-hint quota for this match.", hintsUsed: MAX_HINTS },
         { status: 429 }
       );
     }
 
-    tierIndex = hintsUsed;
-    tierNumber = hintsUsed + 1;
+    // Atomic server-side increment with conditional check: guarantees parallel requests cannot exceed quota
+    try {
+      await dynamo.send(
+        new UpdateCommand({
+          TableName: TABLE,
+          Key: { PK: `MATCH#${matchId}`, SK: "META" },
+          UpdateExpression: `SET ${myRole}.hintsUsed = if_not_exists(${myRole}.hintsUsed, :zero) + :one`,
+          ConditionExpression: `attribute_not_exists(${myRole}.hintsUsed) OR ${myRole}.hintsUsed < :maxHints`,
+          ExpressionAttributeValues: {
+            ":zero": 0,
+            ":one": 1,
+            ":maxHints": MAX_HINTS,
+          },
+        })
+      );
+    } catch (condErr: any) {
+      if (
+        condErr?.name === "ConditionalCheckFailedException" ||
+        condErr?.message?.includes("conditional") ||
+        condErr?.message?.includes("ConditionalCheckFailed")
+      ) {
+        return NextResponse.json(
+          { error: "No hints remaining: You have reached the maximum 3-hint quota for this match.", hintsUsed: MAX_HINTS },
+          { status: 429 }
+        );
+      }
+      throw condErr;
+    }
+
+    tierIndex = currentHints;
+    tierNumber = currentHints + 1;
+    hintsUsed = currentHints + 1;
   }
 
   // Check subscription tier for hints beyond Tier 1 (only for authenticated competitive matches)
@@ -178,6 +226,8 @@ export async function POST(req: Request) {
   const safeFileName = typeof activeFileName === "string" ? activeFileName.slice(0, 100).replace(/[^\w.-]/g, "") : "main";
   const safeCurrentCode = typeof currentCode === "string" ? currentCode.slice(0, 12000).trim() : "";
 
+  // Canonical solutions and complete test harnesses must NEVER be included in the model prompt.
+  // The model only receives the problem description, developer's current diff, and tier instruction.
   const userMessage = `Challenge: ${title}
 Track: ${challenge?.track || "PRODUCTION_SWE"}
 Repository: ${challenge?.repoContext || "production"}
@@ -193,7 +243,7 @@ ${safeCurrentCode || "(empty — player hasn't edited anything yet)"}
 
 ${TIER_INSTRUCTIONS[tierIndex]}`;
 
-  // Smart Socratic fallback derived directly from the challenge's walkthrough
+  // Smart Socratic fallback derived directly from the challenge's walkthrough (conceptual only, never canonical code)
   let hint = FALLBACK_HINTS[tierIndex];
   if (challenge?.walkthrough) {
     if (tierIndex === 0 && challenge.walkthrough.rootCause) {
@@ -212,9 +262,10 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
     if (!GEMINI_API_KEY) {
       console.log("[hint] GEMINI_API_KEY not set — using curated Socratic hint");
     } else {
+      // Current live Google Gemini Flash API model IDs verified via live API response
       const candidateModels = [
-        "gemini-flash-lite-latest",
         "gemini-3.5-flash-lite",
+        "gemini-flash-lite-latest",
         "gemini-3.8-flash",
       ];
       let succeeded = false;
@@ -248,7 +299,23 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
       }
 
       if (!succeeded) {
-        console.warn("[hint] Gemini API temporarily busy; served curated challenge-specific Socratic hint.");
+        console.warn("[hint] Gemini API call unsuccessful; refunding hint reservation and serving curated fallback.");
+        // Refund the reservation if the Gemini call fails in match mode
+        if (!isSoloPractice && match) {
+          try {
+            await dynamo.send(
+              new UpdateCommand({
+                TableName: TABLE,
+                Key: { PK: `MATCH#${matchId}`, SK: "META" },
+                UpdateExpression: `SET ${myRole}.hintsUsed = ${myRole}.hintsUsed - :one`,
+                ExpressionAttributeValues: { ":one": 1 },
+              })
+            );
+            hintsUsed = Math.max(0, hintsUsed - 1);
+          } catch (refundErr) {
+            console.warn("[hint] Could not refund hint reservation:", refundErr);
+          }
+        }
       }
     }
   } catch (err) {
@@ -257,23 +324,12 @@ ${TIER_INSTRUCTIONS[tierIndex]}`;
 
   hint = sanitizeHint(hint, FALLBACK_HINTS[tierIndex]);
 
-  // If match mode, increment hintsUsed in DynamoDB
-  const newHintsUsed = hintsUsed + 1;
-  if (!isSoloPractice && match) {
-    await dynamo.send(
-      new UpdateCommand({
-        TableName: TABLE,
-        Key: { PK: `MATCH#${matchId}`, SK: "META" },
-        UpdateExpression: `SET ${myRole}.hintsUsed = :h`,
-        ExpressionAttributeValues: { ":h": newHintsUsed },
-      })
-    );
-  }
+  const finalHintsUsed = isSoloPractice ? tierNumber : hintsUsed;
 
   return NextResponse.json({
     hint,
-    hintsUsed: newHintsUsed,
-    hintsRemaining: Math.max(0, MAX_HINTS - newHintsUsed),
+    hintsUsed: finalHintsUsed,
+    hintsRemaining: Math.max(0, MAX_HINTS - finalHintsUsed),
     tier: tierNumber,
   });
 }

@@ -24,6 +24,20 @@ function hasRealAwsCredentials(): boolean {
   return key.length > 10;
 }
 
+function hasRealDatabaseUrl(): boolean {
+  const url = process.env.DATABASE_URL;
+  if (!url || !url.startsWith("postgres")) return false;
+  if (url.includes("dummy") || url.includes("your_database_url")) return false;
+  return true;
+}
+
+// Check production persistence safety on startup
+if (process.env.NODE_ENV === "production" && !hasRealAwsCredentials() && !hasRealDatabaseUrl()) {
+  throw new Error(
+    "[FATAL PRODUCTION CONFIGURATION ERROR] Neither valid AWS DynamoDB credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) nor PostgreSQL DATABASE_URL is configured in production. Local JSON file fallback is strictly disallowed in production to prevent silent data loss on ephemeral serverless filesystems."
+  );
+}
+
 // ── Real AWS DynamoDB Client ──────────────────────────────────────────────────
 let realDocClient: any = null;
 if (hasRealAwsCredentials()) {
@@ -175,6 +189,25 @@ function setNestedValue(obj: any, pathStr: string, value: any) {
   cur[parts[parts.length - 1]] = value;
 }
 
+function splitTopLevelCommas(str: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+    if (char === "(") depth++;
+    else if (char === ")") depth--;
+    else if (char === "," && depth === 0) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) parts.push(current);
+  return parts;
+}
+
 function applyUpdateExpression(
   item: any,
   expression?: string,
@@ -190,12 +223,41 @@ function applyUpdateExpression(
 
   const setMatch = expr.match(/SET\s+([\s\S]+?)(?=\s+ADD|\s*$)/i);
   if (setMatch) {
-    const rawAssignments = setMatch[1].split(",");
+    const rawAssignments = splitTopLevelCommas(setMatch[1]);
     for (const raw of rawAssignments) {
       const parts = raw.trim().split("=");
       if (parts.length === 2) {
         const prop = parts[0].trim();
         const valToken = parts[1].trim();
+
+        // Check for if_not_exists(path, default) +/- amount
+        const ifNotExistsMatch = valToken.match(/if_not_exists\(([^,]+),\s*([^)]+)\)\s*([+-])\s*(.+)/);
+        if (ifNotExistsMatch) {
+          const checkField = ifNotExistsMatch[1].trim();
+          const fallbackToken = ifNotExistsMatch[2].trim();
+          const sign = ifNotExistsMatch[3];
+          const amountToken = ifNotExistsMatch[4].trim();
+          const fallbackVal = fallbackToken in values ? Number(values[fallbackToken]) : Number(fallbackToken);
+          const amountVal = amountToken in values ? Number(values[amountToken]) : Number(amountToken);
+          const currentVal = Number(getNestedValue(item, checkField) ?? fallbackVal);
+          const newVal = sign === "+" ? currentVal + amountVal : currentVal - amountVal;
+          setNestedValue(item, prop, newVal);
+          continue;
+        }
+
+        // Check for path +/- amount (e.g. hintsUsed = hintsUsed - 1 or score = score + :one)
+        const mathMatch = valToken.match(/^([a-zA-Z0-9_.]+)\s*([+-])\s*(.+)$/);
+        if (mathMatch) {
+          const checkField = mathMatch[1].trim();
+          const sign = mathMatch[2];
+          const amountToken = mathMatch[3].trim();
+          const amountVal = amountToken in values ? Number(values[amountToken]) : Number(amountToken);
+          const currentVal = Number(getNestedValue(item, checkField) ?? 0);
+          const newVal = sign === "+" ? currentVal + amountVal : currentVal - amountVal;
+          setNestedValue(item, prop, newVal);
+          continue;
+        }
+
         const val = valToken in values ? values[valToken] : valToken;
         setNestedValue(item, prop, val);
       }
@@ -264,6 +326,74 @@ function matchesFilter(
   return true;
 }
 
+function evaluateSingleCondition(item: any, clause: string, values: Record<string, any>): boolean {
+  // attribute_not_exists(field)
+  const notExistsMatch = clause.match(/attribute_not_exists\(([^)]+)\)/);
+  if (notExistsMatch) {
+    const field = notExistsMatch[1].trim();
+    if (!item) return true;
+    const val = getNestedValue(item, field);
+    return val === undefined || val === null;
+  }
+
+  // attribute_exists(field)
+  const existsMatch = clause.match(/attribute_exists\(([^)]+)\)/);
+  if (existsMatch) {
+    const field = existsMatch[1].trim();
+    if (!item) return false;
+    const val = getNestedValue(item, field);
+    return val !== undefined && val !== null;
+  }
+
+  // comparison: field op :val
+  const compMatch = clause.match(/([a-zA-Z0-9_.]+)\s*(=|<>|<|<=|>|>=)\s*(:[a-zA-Z0-9_]+)/);
+  if (compMatch) {
+    const field = compMatch[1].trim();
+    const op = compMatch[2].trim();
+    const token = compMatch[3].trim();
+    const expected = values[token];
+    const actual = item ? getNestedValue(item, field) : undefined;
+
+    if (actual === undefined || actual === null) {
+      return false;
+    }
+
+    if (op === "=") return actual === expected;
+    if (op === "<>") return actual !== expected;
+    if (op === "<") return Number(actual) < Number(expected);
+    if (op === "<=") return Number(actual) <= Number(expected);
+    if (op === ">") return Number(actual) > Number(expected);
+    if (op === ">=") return Number(actual) >= Number(expected);
+  }
+
+  return true;
+}
+
+function evaluateCondition(
+  item: any,
+  conditionExpr?: string,
+  names: Record<string, string> = {},
+  values: Record<string, any> = {}
+): boolean {
+  if (!conditionExpr) return true;
+
+  let expr = conditionExpr;
+  for (const [placeholder, realName] of Object.entries(names)) {
+    expr = expr.replace(new RegExp(placeholder + "\\b", "g"), realName);
+  }
+
+  if (expr.includes(" OR ")) {
+    const parts = expr.split(/\s+OR\s+/);
+    return parts.some((p) => evaluateSingleCondition(item, p.trim(), values));
+  }
+  if (expr.includes(" AND ")) {
+    const parts = expr.split(/\s+AND\s+/);
+    return parts.every((p) => evaluateSingleCondition(item, p.trim(), values));
+  }
+
+  return evaluateSingleCondition(item, expr.trim(), values);
+}
+
 // ── Universal Store Dispatcher ─────────────────────────────────────────────────
 async function executeUniversalCommand(command: any): Promise<any> {
   await ensureDbReady();
@@ -292,6 +422,14 @@ async function executeUniversalCommand(command: any): Promise<any> {
   if (command.constructor?.name === "PutCommand" || (input.Item && !input.Key)) {
     const item = input.Item;
     if (item?.PK && item?.SK) {
+      const existing = memoryStore.get(`${item.PK}###${item.SK}`);
+      if (input.ConditionExpression) {
+        if (!evaluateCondition(existing, input.ConditionExpression, input.ExpressionAttributeNames, input.ExpressionAttributeValues)) {
+          const err: any = new Error("The conditional request failed");
+          err.name = "ConditionalCheckFailedException";
+          throw err;
+        }
+      }
       memoryStore.set(`${item.PK}###${item.SK}`, JSON.parse(JSON.stringify(item)));
       persistToDisk();
 
@@ -316,6 +454,14 @@ async function executeUniversalCommand(command: any): Promise<any> {
     const pk = input.Key?.PK;
     const sk = input.Key?.SK;
     if (pk && sk) {
+      const existing = memoryStore.get(`${pk}###${sk}`);
+      if (input.ConditionExpression) {
+        if (!evaluateCondition(existing, input.ConditionExpression, input.ExpressionAttributeNames, input.ExpressionAttributeValues)) {
+          const err: any = new Error("The conditional request failed");
+          err.name = "ConditionalCheckFailedException";
+          throw err;
+        }
+      }
       memoryStore.delete(`${pk}###${sk}`);
       persistToDisk();
       if (pgSql) {
@@ -339,6 +485,13 @@ async function executeUniversalCommand(command: any): Promise<any> {
           const rows = await pgSql`SELECT item FROM codeduel_store WHERE pk = ${pk} AND sk = ${sk} LIMIT 1`;
           if (rows.length > 0) item = rows[0].item;
         } catch (e) {}
+      }
+      if (input.ConditionExpression) {
+        if (!evaluateCondition(item, input.ConditionExpression, input.ExpressionAttributeNames, input.ExpressionAttributeValues)) {
+          const err: any = new Error("The conditional request failed");
+          err.name = "ConditionalCheckFailedException";
+          throw err;
+        }
       }
       if (!item) {
         item = { PK: pk, SK: sk };

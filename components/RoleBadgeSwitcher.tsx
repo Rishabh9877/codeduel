@@ -91,6 +91,37 @@ export default function RoleBadgeSwitcher({
     border: "rgba(139, 142, 255, 0.25)",
   };
 
+  const isProduction = process.env.NODE_ENV === "production";
+  const demoModeEnabled = process.env.NEXT_PUBLIC_DEMO_MODE === "true" || !isProduction;
+
+  if (!demoModeEnabled) {
+    return (
+      <div
+        className={className}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          padding: "5px 12px",
+          borderRadius: "100px",
+          fontSize: "11px",
+          fontWeight: 700,
+          background: roleConfig.bg,
+          border: `1px solid ${roleConfig.border}`,
+          color: roleConfig.color,
+          cursor: "default",
+          fontFamily: "'JetBrains Mono', monospace",
+          userSelect: "none",
+        }}
+        title={`Verified Account Role: ${roleConfig.label}`}
+        suppressHydrationWarning
+      >
+        <span>{roleConfig.icon}</span>
+        <span>{roleConfig.label}</span>
+      </div>
+    );
+  }
+
   return (
     <>
       <button

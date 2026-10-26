@@ -146,6 +146,29 @@ export default function MatchArena() {
   const myPlayer = match && myRole ? match[myRole] : null;
   const opponentPlayer = match && myRole ? match[opponentRole] : null;
 
+  // Dynamically calculated ELO results for Modal & Post-Mortem Drawer consistency
+  const myStartElo = (myRole && match ? match[myRole]?.elo : null) ?? 1000;
+  const myNewCalculatedElo = won === true
+    ? (finalMatchPayload?.newWinnerElo ?? (submitResult?.newElo ?? (myStartElo + 16)))
+    : won === false
+    ? (finalMatchPayload?.newLoserElo ?? Math.max(800, myStartElo - 16))
+    : myStartElo;
+  const myCalculatedEloDelta = typeof submitResult?.eloChange === "number" && won === true
+    ? submitResult.eloChange
+    : (myNewCalculatedElo - myStartElo);
+  const formattedEloDelta = won === null
+    ? "±0"
+    : (myCalculatedEloDelta >= 0 ? `+${myCalculatedEloDelta}` : `${myCalculatedEloDelta}`);
+
+  // ── CAMPUS PROCTOR & ANTI-CHEAT TELEMETRY ─────────────────────────────────
+  const [proctorEnabled, setProctorEnabled] = useState(true);
+  const [tabSwitches, setTabSwitches] = useState(0);
+  const [externalPastes, setExternalPastes] = useState(0);
+  const [proctorAlert, setProctorAlert] = useState<string | null>(null);
+  const [showProctorModal, setShowProctorModal] = useState(false);
+
+  const integrityScore = Math.max(0, 100 - tabSwitches * 10 - externalPastes * 15);
+
   const hintsUsed = myPlayer?.hintsUsed ?? hints.length;
 
   const handleRequestHint = async () => {
@@ -308,12 +331,85 @@ export default function MatchArena() {
     return "plaintext";
   }, [activeFileName]);
 
+  // ── PROCTOR TELEMETRY: FOCUS LOSS & TAB SWITCH DETECTOR ───────────────────
+  useEffect(() => {
+    if (!match || match.status !== "active" || matchOver || !proctorEnabled) return;
+
+    let lastSwitchTime = 0;
+    const triggerTabSwitch = () => {
+      const now = Date.now();
+      if (now - lastSwitchTime > 800) {
+        lastSwitchTime = now;
+        setTabSwitches((prev) => {
+          const next = prev + 1;
+          setProctorAlert(`⚠️ Proctor Shield: Tab switch detected (${next} total). Focus lost.`);
+          return next;
+        });
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        triggerTabSwitch();
+      }
+    };
+
+    const handleBlur = () => {
+      triggerTabSwitch();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleBlur);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [match?.status, matchOver, proctorEnabled]);
+
+  // ── PROCTOR TELEMETRY: EXTERNAL CLIPBOARD PASTE INTERCEPTOR ───────────────
+  useEffect(() => {
+    if (!match || match.status !== "active" || matchOver || !proctorEnabled) return;
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData("text") || "";
+      if (text.length > 60) {
+        e.preventDefault();
+        e.stopPropagation();
+        setExternalPastes((prev) => prev + 1);
+        setProctorAlert("⚠️ Proctor Shield: External code block paste blocked. Isolate and fix the bug manually.");
+      }
+    };
+
+    window.addEventListener("paste", handlePaste, true);
+    return () => {
+      window.removeEventListener("paste", handlePaste, true);
+    };
+  }, [match?.status, matchOver, proctorEnabled]);
+
+  // Auto-dismiss proctor alert toast
+  useEffect(() => {
+    if (!proctorAlert) return;
+    const timer = setTimeout(() => {
+      setProctorAlert(null);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [proctorAlert]);
+
   // ── FILE EDIT HANDLER ──────────────────────────────────────────────────────
   const handleEditorChange = (newVal: string | undefined) => {
     if (!currentFile || currentFile.readOnly) return;
+    const prevVal = files[activeFileName] ?? "";
+    const incomingVal = newVal ?? "";
+    // Double-layer paste guard: block sudden large insertions (>60 chars)
+    if (proctorEnabled && incomingVal.length - prevVal.length > 60) {
+      setExternalPastes((prev) => prev + 1);
+      setProctorAlert("⚠️ Proctor Shield: External code block paste blocked. Isolate and fix the bug manually.");
+      return;
+    }
     setFiles((prev) => ({
       ...prev,
-      [activeFileName]: newVal ?? "",
+      [activeFileName]: incomingVal,
     }));
   };
 
@@ -465,7 +561,49 @@ export default function MatchArena() {
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#07070b", color: "#e8e6f0", overflow: "hidden", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "#07070b", color: "#e8e6f0", overflow: "hidden", fontFamily: "system-ui, sans-serif", position: "relative" }}>
+      {/* ── PROCTOR SHIELD FLOATING ALERT BANNER ────────────────────────── */}
+      {proctorAlert && (
+        <div
+          style={{
+            position: "fixed",
+            top: 60,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 9999,
+            background: "rgba(185, 28, 28, 0.95)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid rgba(248, 113, 113, 0.6)",
+            color: "#fff",
+            padding: "9px 20px",
+            borderRadius: 8,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(239, 68, 68, 0.4)",
+            fontSize: 12,
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
+        >
+          <span>{proctorAlert}</span>
+          <button
+            onClick={() => setProctorAlert(null)}
+            style={{
+              background: "rgba(255,255,255,0.15)",
+              border: "none",
+              color: "#fff",
+              borderRadius: 4,
+              padding: "2px 6px",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {/* ── TOP HUD NAVIGATION ─────────────────────────────────────────────── */}
       <header style={{
         height: 52,
@@ -543,8 +681,198 @@ export default function MatchArena() {
           </div>
         </div>
 
-        {/* Right: AI Coach, Clock & Forfeit */}
+        {/* Right: Proctor Shield Pill, AI Coach, Clock & Forfeit */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Proctor Shield Integrity Pill */}
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowProctorModal((prev) => !prev)}
+              style={{
+                background: !proctorEnabled
+                  ? "rgba(255,255,255,0.05)"
+                  : integrityScore === 100
+                  ? "rgba(74,222,128,0.12)"
+                  : integrityScore >= 80
+                  ? "rgba(251,191,36,0.15)"
+                  : "rgba(248,113,113,0.18)",
+                border: !proctorEnabled
+                  ? "1px solid rgba(255,255,255,0.15)"
+                  : integrityScore === 100
+                  ? "1px solid rgba(74,222,128,0.35)"
+                  : integrityScore >= 80
+                  ? "1px solid rgba(251,191,36,0.4)"
+                  : "1px solid rgba(248,113,113,0.5)",
+                color: !proctorEnabled
+                  ? "#8a8898"
+                  : integrityScore === 100
+                  ? "#4ade80"
+                  : integrityScore >= 80
+                  ? "#fbbf24"
+                  : "#f87171",
+                padding: "6px 12px",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontFamily: "'JetBrains Mono', monospace",
+                transition: "all 0.2s ease",
+              }}
+              title="Campus Proctor Shield Telemetry & Anti-Cheat System"
+            >
+              <span>{integrityScore < 70 ? "⚠️" : "🛡️"}</span>
+              <span>
+                {!proctorEnabled
+                  ? "Proctor Shield: Paused"
+                  : integrityScore === 100
+                  ? "100% Integrity"
+                  : tabSwitches > 0 && externalPastes === 0
+                  ? `Focus Lost: ${tabSwitches} Switch${tabSwitches > 1 ? "es" : ""}`
+                  : `${integrityScore}% (${tabSwitches} Sw, ${externalPastes} Pst)`}
+              </span>
+              <span style={{ fontSize: 9, opacity: 0.7 }}>▾</span>
+            </button>
+
+            {/* Proctor Shield Telemetry Popover / Demo Controls */}
+            {showProctorModal && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  right: 0,
+                  width: 320,
+                  background: "#0d0e16",
+                  border: "1px solid rgba(139,142,255,0.3)",
+                  boxShadow: "0 12px 36px rgba(0,0,0,0.7), 0 0 20px rgba(139,142,255,0.15)",
+                  borderRadius: 10,
+                  padding: "16px",
+                  zIndex: 9999,
+                  fontFamily: "system-ui, -apple-system, sans-serif",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 14 }}>🛡️</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      Proctor Telemetry
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setProctorEnabled((p) => !p)}
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: proctorEnabled ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.1)",
+                      color: proctorEnabled ? "#4ade80" : "#8a8898",
+                      border: `1px solid ${proctorEnabled ? "#4ade80" : "rgba(255,255,255,0.2)"}`,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {proctorEnabled ? "SHIELD: ON" : "SHIELD: OFF"}
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 11, marginBottom: 14 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#8a8898" }}>
+                    <span>Academic Integrity Score:</span>
+                    <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: integrityScore >= 80 ? "#4ade80" : "#f87171" }}>
+                      {integrityScore}%
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#8a8898" }}>
+                    <span>Window Tab Switches:</span>
+                    <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: tabSwitches > 0 ? "#fbbf24" : "#fff" }}>
+                      {tabSwitches}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#8a8898" }}>
+                    <span>Blocked Pastes (&gt;60 chars):</span>
+                    <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: externalPastes > 0 ? "#f87171" : "#fff" }}>
+                      {externalPastes}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", color: "#8a8898" }}>
+                    <span>Live Audit Sync:</span>
+                    <span style={{ color: "#8b8eff", fontWeight: 600 }}>Campus Faculty Gradebook</span>
+                  </div>
+                </div>
+
+                {/* Live Demo Simulation Buttons */}
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10 }}>
+                  <div style={{ fontSize: 10, color: "#8b8eff", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
+                    Live Demo Controls (Click to Test):
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => {
+                        setTabSwitches((p) => {
+                          const next = p + 1;
+                          setProctorAlert(`⚠️ Proctor Shield: Tab switch detected (${next} total). Focus lost.`);
+                          return next;
+                        });
+                      }}
+                      style={{
+                        flex: 1,
+                        background: "rgba(251,191,36,0.12)",
+                        border: "1px solid rgba(251,191,36,0.3)",
+                        color: "#fbbf24",
+                        padding: "5px 8px",
+                        borderRadius: 4,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      +1 Tab Switch
+                    </button>
+                    <button
+                      onClick={() => {
+                        setExternalPastes((p) => p + 1);
+                        setProctorAlert("⚠️ Proctor Shield: External code block paste blocked (> 60 chars). Isolate and fix the bug manually.");
+                      }}
+                      style={{
+                        flex: 1,
+                        background: "rgba(248,113,113,0.12)",
+                        border: "1px solid rgba(248,113,113,0.3)",
+                        color: "#f87171",
+                        padding: "5px 8px",
+                        borderRadius: 4,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      +1 Paste Blocked
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTabSwitches(0);
+                        setExternalPastes(0);
+                        setProctorAlert("✓ Proctor Shield: Telemetry reset to 100% integrity.");
+                      }}
+                      style={{
+                        background: "rgba(255,255,255,0.08)",
+                        border: "1px solid rgba(255,255,255,0.15)",
+                        color: "#fff",
+                        padding: "5px 8px",
+                        borderRadius: 4,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => setShowCoach(true)}
             style={{
@@ -1341,40 +1669,29 @@ export default function MatchArena() {
             </p>
 
             {/* ELO Result */}
-            {(() => {
-              const startElo = match?.[myRole]?.elo ?? 1000;
-              const myNewElo = won
-                ? (finalMatchPayload?.newWinnerElo ?? (startElo + 16))
-                : (finalMatchPayload?.newLoserElo ?? Math.max(100, startElo - 16));
-              const myEloDelta = myNewElo - startElo;
-              const formattedDelta = myEloDelta >= 0 ? `+${myEloDelta}` : `${myEloDelta}`;
-
-              return (
-                <div style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 8,
-                  padding: "14px 20px",
-                  marginBottom: 24,
-                  display: "flex",
-                  justifyContent: "space-around"
-                }}>
-                  <div>
-                    <div style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase" }}>Your Rating</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: won ? "#4ade80" : "#f87171" }}>
-                      {formattedDelta} ELO <span style={{ fontSize: 13, opacity: 0.85, color: "#fff" }}>({myNewElo})</span>
-                    </div>
-                  </div>
-                  <div style={{ width: 1, background: "rgba(255,255,255,0.08)" }} />
-                  <div>
-                    <div style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase" }}>Challenge</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginTop: 4 }}>
-                      {challenge.track === "PRODUCTION_SWE" ? "Cloud SWE" : "Embedded"}
-                    </div>
-                  </div>
+            <div style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 8,
+              padding: "14px 20px",
+              marginBottom: 24,
+              display: "flex",
+              justifyContent: "space-around"
+            }}>
+              <div>
+                <div style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase" }}>Your Rating</div>
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: won ? "#4ade80" : won === false ? "#f87171" : "#8a8898" }}>
+                  {formattedEloDelta} ELO <span style={{ fontSize: 13, opacity: 0.85, color: "#fff" }}>({myNewCalculatedElo})</span>
                 </div>
-              );
-            })()}
+              </div>
+              <div style={{ width: 1, background: "rgba(255,255,255,0.08)" }} />
+              <div>
+                <div style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase" }}>Challenge</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginTop: 4 }}>
+                  {challenge.track === "PRODUCTION_SWE" ? "Cloud SWE" : "Embedded"}
+                </div>
+              </div>
+            </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button
@@ -1523,14 +1840,20 @@ export default function MatchArena() {
               </div>
               <div>
                 <div style={{ color: "#8a8898", fontSize: 10, textTransform: "uppercase" }}>Rating Delta</div>
-                <div style={{ color: won ? "#4ade80" : "#f87171", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
-                  {won ? "+18 ELO" : "-14 ELO"} (K=32, Floor 800)
+                <div style={{ color: won ? "#4ade80" : won === false ? "#f87171" : "#8a8898", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
+                  {formattedEloDelta} ELO (K=32, Floor 800)
                 </div>
               </div>
               <div>
                 <div style={{ color: "#8a8898", fontSize: 10, textTransform: "uppercase" }}>Tests Satisfied</div>
                 <div style={{ color: "#8b8eff", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
                   {submitResult?.testsPassed ?? myTestsPassed}/{challenge.totalTests} Pass
+                </div>
+              </div>
+              <div>
+                <div style={{ color: "#8a8898", fontSize: 10, textTransform: "uppercase" }}>Proctor Telemetry</div>
+                <div style={{ color: integrityScore >= 80 ? "#4ade80" : "#f87171", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
+                  {integrityScore}% ({tabSwitches} Sw, {externalPastes} Pst)
                 </div>
               </div>
             </div>

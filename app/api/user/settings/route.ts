@@ -32,30 +32,33 @@ export async function POST(req: Request) {
     const isAdminUser = userLogin === "rishabh9877" || userName === "rishabh9877" || (session.user as any).role === "ADMIN" || (session.user as any).isAdmin === true;
 
     if (role === "ADMIN") {
-      if (!isAdminUser) {
-        return NextResponse.json({ error: "Unauthorized: Admin privileges required." }, { status: 403 });
-      }
-      updateValues[":role"] = "ADMIN";
-      updateClauses.push("#r = :role");
+      // Platform Admin role CANNOT be assigned or escalated via user settings
+      return NextResponse.json(
+        { error: "Forbidden: Platform Administrator role cannot be assigned or modified via user settings." },
+        { status: 403 }
+      );
     } else if (role === "FACULTY") {
       if (isAdminUser) {
         updateValues[":role"] = "FACULTY";
         updateClauses.push("#r = :role");
       } else {
-        // Fetch user profile to verify existing faculty status, academic domain, or passcode
+        // Fetch user profile to verify existing faculty status or passcode
         const profRes = await dynamo.send(
           new GetCommand({ TableName: TABLE, Key: { PK: `USER#${userId}`, SK: "PROFILE" } })
         );
         const isAlreadyFaculty = profRes.Item?.role === "FACULTY" || profRes.Item?.role === "ADMIN";
-        const userEmail = session.user.email || "";
-        const isAcademicEmail = userEmail.endsWith(".edu") || userEmail.endsWith(".ac.in");
-        const expectedPasscode = (process.env.FACULTY_SECRET || "CODEDUEL-FACULTY-2026").toUpperCase();
-        const isPasscodeValid = body.facultyPasscode && body.facultyPasscode.trim().toUpperCase() === expectedPasscode;
+        const expectedPasscode = process.env.FACULTY_SECRET ? process.env.FACULTY_SECRET.trim().toUpperCase() : null;
+        const isPasscodeValid = Boolean(
+          expectedPasscode &&
+          body.facultyPasscode &&
+          body.facultyPasscode.trim().toUpperCase() === expectedPasscode
+        );
 
-        if (!isAlreadyFaculty && !isAcademicEmail && !isPasscodeValid) {
+        // .edu email alone does NOT grant faculty; must be existing verified FACULTY or supply valid FACULTY_SECRET
+        if (!isAlreadyFaculty && !isPasscodeValid) {
           return NextResponse.json(
             {
-              error: "Faculty credentials required: To access instructor privileges, please enter a valid Faculty Verification Key or sign in with an official university email (.edu / .ac.in).",
+              error: "Faculty credentials required: To access instructor privileges, please enter a valid Faculty Verification Key from your department administrator.",
             },
             { status: 403 }
           );

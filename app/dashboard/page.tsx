@@ -283,6 +283,18 @@ export default function Dashboard() {
     return [];
   });
 
+  const [friendsEnabled, setFriendsEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/friends")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && d.enabled === false) setFriendsEnabled(false);
+        else setFriendsEnabled(true);
+      })
+      .catch(() => setFriendsEnabled(false));
+  }, []);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
@@ -998,24 +1010,26 @@ export default function Dashboard() {
                 <span style={{ fontSize: 11, color: "var(--green)", fontFamily: "'JetBrains Mono', monospace" }}>Instant →</span>
               </button>
 
-              {/* Option 4: Friend Challenge */}
-              <button 
-                onClick={() => { 
-                  setShowMatchModal(false); 
-                  const url = selectedProblem ? `/friends?challengeId=${selectedProblem.id}` : "/friends";
-                  router.push(url); 
-                  setSelectedProblem(null);
-                }}
-                style={{
-                  background: "rgba(255,255,255,0.04)", color: "var(--text)", border: "1px solid var(--border)",
-                  padding: "10px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
-                  transition: "background 0.2s"
-                }}
-              >
-                <span style={{ fontSize: 14 }}>👥</span>
-                Challenge a Friend Directly
-              </button>
+              {/* Option 4: Friend Challenge (hidden if database is Dynamo-only without PostgreSQL) */}
+              {friendsEnabled !== false && (
+                <button 
+                  onClick={() => { 
+                    setShowMatchModal(false); 
+                    const url = selectedProblem ? `/friends?challengeId=${selectedProblem.id}` : "/friends";
+                    router.push(url); 
+                    setSelectedProblem(null);
+                  }}
+                  style={{
+                    background: "rgba(255,255,255,0.04)", color: "var(--text)", border: "1px solid var(--border)",
+                    padding: "10px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
+                    transition: "background 0.2s"
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>👥</span>
+                  Challenge a Friend Directly
+                </button>
+              )}
             </div>
 
             <button 
@@ -1042,7 +1056,7 @@ export default function Dashboard() {
                 Searching for opponent near your ELO ({elo})... 
                 <strong style={{ marginLeft: 6, color: "#fff" }}>{queueDuration}s elapsed</strong>
                 <span style={{ fontSize: 11, color: "var(--muted2)", marginLeft: 8 }}>
-                  (Auto-fallback to Mock Bot in {Math.max(0, 10 - queueDuration)}s)
+                  (Auto-fallback to Mock Bot in {Math.max(0, 30 - queueDuration)}s)
                 </span>
               </span>
             </span>

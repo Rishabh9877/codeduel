@@ -26,28 +26,35 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         const isProduction = process.env.NODE_ENV === "production";
-        const isOAuthConfigured = Boolean(
-          process.env.GITHUB_CLIENT_ID &&
-          process.env.GITHUB_CLIENT_ID !== "dummy_client_id" &&
-          process.env.GITHUB_CLIENT_SECRET &&
-          process.env.GITHUB_CLIENT_SECRET !== "dummy_client_secret"
-        );
+        const allowGuestLogin =
+          process.env.ALLOW_GUEST_LOGIN === "true" || (!isProduction && process.env.ALLOW_GUEST_LOGIN !== "false");
 
-        if (isProduction && isOAuthConfigured && process.env.ALLOW_GUEST_DEV !== "true") {
-          throw new Error("Guest developer bypass is disabled in production with active OAuth. Please authenticate via GitHub.");
+        if (!allowGuestLogin) {
+          throw new Error("Guest credentials provider is disabled. Please authenticate via GitHub OAuth.");
         }
 
-        const slot = credentials?.guestId === "2" || credentials?.username?.includes("2") ? "2" : "1";
-        const userId = `guest_${slot}`;
-        const username = credentials?.username?.trim() || (slot === "1" ? "Guest_Alpha" : "Guest_Beta");
-        const avatar = slot === "1"
-          ? "https://api.dicebear.com/7.x/bottts/svg?seed=guest1"
-          : "https://api.dicebear.com/7.x/bottts/svg?seed=guest2";
+        const isFaculty = credentials?.guestId === "faculty" || credentials?.username?.toLowerCase().includes("faculty");
+        const isServerDemoMode = process.env.DEMO_MODE === "true" || (!isProduction && process.env.NEXT_PUBLIC_DEMO_MODE === "true");
+
+        if (isFaculty && isProduction && !isServerDemoMode) {
+          throw new Error("Demo faculty login is disabled in production unless server DEMO_MODE=true.");
+        }
+
+        const slot = isFaculty ? "faculty" : (credentials?.guestId === "2" || credentials?.username?.includes("2") ? "2" : "1");
+        const userId = isFaculty ? "faculty_vikram_malhotra" : `guest_${slot}`;
+        const username = isFaculty
+          ? "Dr. Vikram Malhotra (Faculty Demo)"
+          : (credentials?.username?.trim() || (slot === "1" ? "Guest_Alpha" : "Guest_Beta"));
+        const avatar = isFaculty
+          ? "https://api.dicebear.com/7.x/bottts/svg?seed=prof_malhotra"
+          : (slot === "1"
+              ? "https://api.dicebear.com/7.x/bottts/svg?seed=guest1"
+              : "https://api.dicebear.com/7.x/bottts/svg?seed=guest2");
 
         return {
           id: userId,
           name: username,
-          email: `${userId}@local.dev`,
+          email: isFaculty ? "prof.malhotra@demo-campus.test" : `${userId}@local.dev`,
           image: avatar,
         };
       },
@@ -60,10 +67,17 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, profile }) {
       const userId = user.id!;
       const ghUsername = (profile as any)?.login ?? user.name ?? "anonymous";
-      const isAdminUser =
-        ghUsername.toLowerCase() === "rishabh9877" ||
-        userId === "Rishabh9877" ||
-        (user.email && user.email === process.env.ADMIN_EMAIL);
+
+      // Maintainer identity resolution: match on GitHub numeric ID or verified email (never username)
+      const ghNumericId = (profile as any)?.id != null ? String((profile as any).id) : null;
+      const adminGithubId = process.env.ADMIN_GITHUB_ID?.trim();
+      const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+      const userEmail = user.email?.trim().toLowerCase();
+
+      const isAdminUser = Boolean(
+        (adminGithubId && ghNumericId && ghNumericId === adminGithubId) ||
+        (adminEmail && userEmail && userEmail === adminEmail)
+      );
 
       try {
         // Check if user already exists in DynamoDB
@@ -76,6 +90,7 @@ export const authOptions: NextAuthOptions = {
 
         // First time login — create profile
         if (!existing.Item) {
+          const isFacultyUser = userId === "faculty_vikram_malhotra" || userId === "demo_faculty";
           await dynamo.send(
             new PutCommand({
               TableName: TABLE,
@@ -87,8 +102,9 @@ export const authOptions: NextAuthOptions = {
                 email: user.email,
                 avatar: user.image,
                 elo: 1000,
-                role: isAdminUser ? "ADMIN" : "INDIVIDUAL",
+                role: isAdminUser ? "ADMIN" : isFacultyUser ? "FACULTY" : "INDIVIDUAL",
                 isAdmin: isAdminUser,
+                isGuest: userId.startsWith("guest_") || isFacultyUser,
                 wins: 0,
                 losses: 0,
                 createdAt: Date.now(),
@@ -96,21 +112,25 @@ export const authOptions: NextAuthOptions = {
             })
           );
 
-          // Also write their leaderboard entry
-          await dynamo.send(
-            new PutCommand({
-              TableName: TABLE,
-              Item: {
-                PK: `USER#${userId}`,
-                SK: "LEADERBOARD",
-                GSI1PK: "LEADERBOARD#GLOBAL",
-                GSI1SK: 1000,
-                userId,
-                username: ghUsername,
-                avatar: user.image,
-              },
-            })
-          );
+          // Guests must NEVER appear on the global leaderboard in production
+          const isProduction = process.env.NODE_ENV === "production";
+          const isGuestUser = userId.startsWith("guest_");
+          if (!isProduction || !isGuestUser) {
+            await dynamo.send(
+              new PutCommand({
+                TableName: TABLE,
+                Item: {
+                  PK: `USER#${userId}`,
+                  SK: "LEADERBOARD",
+                  GSI1PK: "LEADERBOARD#GLOBAL",
+                  GSI1SK: 1000,
+                  userId,
+                  username: ghUsername,
+                  avatar: user.image,
+                },
+              })
+            );
+          }
         } else if (isAdminUser && !existing.Item.isAdmin) {
           // Record platform founder status without overriding user's chosen testing role
           await dynamo.send(
@@ -168,6 +188,8 @@ export const authOptions: NextAuthOptions = {
         if (login === "rishabh9877" || user.id === "rishabh9877" || (user.id || "").toLowerCase() === "rishabh9877") {
           token.role = "ADMIN";
           token.isAdmin = true;
+        } else if (user.id === "faculty_vikram_malhotra" || user.id === "demo_faculty") {
+          token.role = "FACULTY";
         }
       }
       return token;

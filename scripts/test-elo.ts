@@ -57,11 +57,11 @@ assert(
 
 // Test 6: Rating floor protection (rating cannot drop below 800)
 const nearFloor = 805;
-const beatenByPro = 1600;
-const newLoserElo = calcElo(nearFloor, beatenByPro, false);
+const beatenByPeer = 1000;
+const newLoserElo = calcElo(nearFloor, beatenByPeer, false);
 assert(
-  newLoserElo >= DEFAULT_RATING_FLOOR,
-  `Rating floor maintained: 805 loser drops to ${newLoserElo} (>= floor ${DEFAULT_RATING_FLOOR})`
+  newLoserElo === DEFAULT_RATING_FLOOR,
+  `Rating floor maintained: 805 loser clamped to ${newLoserElo} (floor ${DEFAULT_RATING_FLOOR})`
 );
 
 // Test 7: Bot match rating updates

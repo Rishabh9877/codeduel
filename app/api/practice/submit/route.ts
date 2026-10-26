@@ -8,24 +8,20 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
 export const dynamic = "force-dynamic";
 
-const practiceRateLimit = new Map<string, { count: number; resetAt: number }>();
+import { checkRateLimitDb, getClientIp, getActionRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: Request) {
   try {
-    const forwarded = req.headers.get("x-forwarded-for");
-    const clientIp = forwarded ? forwarded.split(",")[0].trim() : "127.0.0.1";
+    const clientIp = getClientIp(req);
 
-    const now = Date.now();
-    const entry = practiceRateLimit.get(clientIp);
-    if (!entry || now > entry.resetAt) {
-      practiceRateLimit.set(clientIp, { count: 1, resetAt: now + 60000 });
-    } else if (entry.count >= 20) {
+    // Distributed database-backed rate limit: configurable via RATE_LIMIT_PRACTICE_SUBMIT, elevated in DEMO_MODE
+    const maxSubmissions = getActionRateLimit("practice_submit", 20);
+    const rl = await checkRateLimitDb("practice_submit", clientIp, maxSubmissions, 60);
+    if (!rl.allowed) {
       return NextResponse.json(
         { error: "Too many code execution requests. Please pause for a few seconds before testing again." },
         { status: 429 }
       );
-    } else {
-      entry.count++;
     }
 
     const body = await req.json();

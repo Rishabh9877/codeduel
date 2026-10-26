@@ -8,7 +8,7 @@ import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { getChallengeById, getRandomChallenge } from "@/lib/challenges";
 import type { Challenge } from "@/lib/challenges";
-import { STARTING_ELO } from "@/lib/elo";
+import { STARTING_ELO, DEFAULT_RATING_FLOOR } from "@/lib/elo";
 import { v4 as uuidv4 } from "uuid";
 
 const MATCH_DURATION_MS = 15 * 60 * 1000;
@@ -87,7 +87,7 @@ export async function POST(req: Request) {
 
     const matchId = uuidv4();
     const botId = "bot_sentinel_ai";
-    const botElo = Math.max(600, myElo + Math.floor(Math.random() * 30 - 15));
+    const botElo = Math.max(DEFAULT_RATING_FLOOR, myElo + Math.floor(Math.random() * 30 - 15));
     const ttl = Math.floor(nowMs / 1000) + 7200;
 
     await dynamo.send(

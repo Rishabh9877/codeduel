@@ -8,7 +8,7 @@ import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { dynamo, TABLE } from "@/lib/dynamo";
 import { getChallengeById, getRandomChallenge } from "@/lib/challenges";
 import { checkUserDuelQuota } from "@/lib/subscription";
-import { STARTING_ELO } from "@/lib/elo";
+import { STARTING_ELO, DEFAULT_RATING_FLOOR } from "@/lib/elo";
 import { v4 as uuidv4 } from "uuid";
 
 const MATCH_DURATION_MS = 15 * 60 * 1000;
@@ -102,15 +102,15 @@ export async function POST(req: Request) {
   const initialQueuedAt = existingQueue.Item?.queuedAt ?? clientQueuedAt ?? nowMs;
   const waitDurationMs = nowMs - initialQueuedAt;
 
-  // 5 — Fallback to Mock Bot: if ?demo=true or queued >= 10 seconds
-  if (forceDemo || waitDurationMs >= 10000) {
+  // 5 — Fallback to Mock Bot: if ?demo=true or queued >= 30 seconds (allowing 15s range expansion to find human peers)
+  if (forceDemo || waitDurationMs >= 30000) {
     const challenge = requestedChallengeId
       ? getChallengeById(requestedChallengeId) ?? getRandomChallenge(requestedTrack, myElo, 'duo')
       : getRandomChallenge(requestedTrack, myElo, 'duo');
 
     const matchId = uuidv4();
     const botId = "bot_sentinel_ai";
-    const botElo = Math.max(600, myElo + Math.floor(Math.random() * 30 - 15));
+    const botElo = Math.max(DEFAULT_RATING_FLOOR, myElo + Math.floor(Math.random() * 30 - 15));
 
     const botSlot = {
       userId: botId,

@@ -57,18 +57,23 @@ export async function POST(req: Request) {
       }
     }
 
-    if (cohortItem.instructorId !== userId) {
-      // Check if user is at least verified faculty or admin
-      const profRes = await dynamo.send(
-        new GetCommand({ TableName: TABLE, Key: { PK: `USER#${userId}`, SK: "PROFILE" } })
+    // Strict Server-Side Role Enforcement: Students must NEVER be able to create assignments (403)
+    const profRes = await dynamo.send(
+      new GetCommand({ TableName: TABLE, Key: { PK: `USER#${userId}`, SK: "PROFILE" } })
+    );
+    const callerRole = profRes.Item?.role || (session.user as any).role || "STUDENT";
+    if (callerRole === "STUDENT" || (callerRole !== "FACULTY" && callerRole !== "ADMIN")) {
+      return NextResponse.json(
+        { error: "Forbidden: Student accounts cannot create assignments. Verified faculty or platform admin role required." },
+        { status: 403 }
       );
-      const callerRole = profRes.Item?.role || (session.user as any).role;
-      if (callerRole !== "FACULTY" && callerRole !== "ADMIN") {
-        return NextResponse.json(
-          { error: "Forbidden: Only the verified course instructor or platform admin can create assignments for this cohort." },
-          { status: 403 }
-        );
-      }
+    }
+
+    if (cohortItem.instructorId !== userId && callerRole !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Forbidden: Only the verified course instructor or platform admin can create assignments for this cohort." },
+        { status: 403 }
+      );
     }
     const assignmentId = `asg-${Date.now().toString(36)}`;
     const now = new Date().toISOString();

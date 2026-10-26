@@ -48,6 +48,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid subscription tier" }, { status: 400 });
     }
 
+    // Security Guard: Prevent arbitrary client self-granting of paid tiers without payment
+    if (targetTier === "PRO" || targetTier === "CAMPUS") {
+      const authHeader = req.headers.get("x-admin-key");
+      const isAdminKeyValid = authHeader && process.env.ADMIN_SECRET && authHeader.trim() === process.env.ADMIN_SECRET.trim();
+      const isAdminSession = (session.user as any).role === "ADMIN" || (session.user as any).isAdmin === true;
+
+      if (!isAdminKeyValid && !isAdminSession) {
+        return NextResponse.json(
+          {
+            error:
+              "Payment required: Direct self-granting of PRO or CAMPUS tiers is disabled. Payment gateway checkout (Stripe / Razorpay) is required to activate paid subscription tiers.",
+          },
+          { status: 402 }
+        );
+      }
+    }
+
     const success = await updateUserSubscriptionTier(userId, targetTier);
     if (!success) {
       return NextResponse.json({ error: "Failed to update subscription" }, { status: 500 });
