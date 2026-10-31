@@ -1063,7 +1063,7 @@ export default function MatchArena() {
                     cursor: "pointer",
                   }}
                 >
-                  ⚡ Hardware & Scope
+                  ⚡ Simulated Peripheral &amp; Signal View
                 </button>
               )}
             </div>
@@ -1838,7 +1838,7 @@ export default function MatchArena() {
               <div>
                 <div style={{ color: "#8a8898", fontSize: 10, textTransform: "uppercase" }}>Execution Latency</div>
                 <div style={{ color: "#fff", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
-                  {submitResult?.runtimeMs || 184}ms (P50 SLA)
+                  {submitResult?.runtimeMs ? `${submitResult.runtimeMs}ms (Sandbox Exec)` : "< 250ms Sandbox Exec"}
                 </div>
               </div>
               <div>

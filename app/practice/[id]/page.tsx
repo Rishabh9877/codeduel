@@ -716,7 +716,7 @@ export default function SoloPracticeArena() {
                     cursor: "pointer",
                   }}
                 >
-                  ⚡ Hardware & Scope
+                  ⚡ Simulated Peripheral &amp; Signal View
                 </button>
               )}
             </div>

@@ -233,12 +233,35 @@ export function SimulatedHardwarePanel({
       <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#8b8eff", textTransform: "uppercase" }}>
-            ARM Cortex-M MMIO System Control Block (SCB)
+            Cortex-M Simulated Peripheral &amp; SCB Registers
           </span>
           <span style={{ fontSize: 10, fontFamily: "JetBrains Mono", color: isSolved ? "#4ade80" : "#f43f5e" }}>
             {isSolved ? "● STATUS: NOMINAL (0 FAULTS)" : "▲ STATUS: FAULT ACTIVE"}
           </span>
         </div>
+
+        {/* Hardware Context Peripheral Registers (e.g. UART, SPI, GPIO, CAN) */}
+        {hardwareContext?.registers && hardwareContext.registers.length > 0 && (
+          <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 10, color: "#8a8898", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>
+              Peripheral MMIO Registers ({hardwareContext.busProtocol})
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {hardwareContext.registers.map((reg, idx) => (
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontFamily: "JetBrains Mono", background: "rgba(255,255,255,0.02)", padding: "4px 8px", borderRadius: 4 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ color: "#38bdf8", fontWeight: 600 }}>{reg.name}</span>
+                    <span style={{ color: "#6e6d7a", fontSize: 10 }}>({reg.address})</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <span style={{ color: "#4ade80", fontWeight: 700 }}>{reg.value}</span>
+                    <span style={{ color: "#8a8898", fontSize: 10 }}>{reg.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* CFSR Register Card */}
         <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
@@ -379,7 +402,9 @@ export function SimulatedHardwarePanel({
       <div style={{ padding: "12px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#08080d" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#fbbf24" }}>⚡ TARGET:</span>
+            <span style={{ fontSize: 10, fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              Simulated Peripheral &amp; Signal View
+            </span>
             <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "'JetBrains Mono', monospace" }}>
               {hardwareContext.mcu}
             </span>
@@ -438,7 +463,7 @@ export function SimulatedHardwarePanel({
               fontFamily: "JetBrains Mono",
             }}
           >
-            📈 DSO &amp; Logic Analyzer
+            📈 Simulated Waveform &amp; Logic
           </button>
           <button
             onClick={() => setActiveTab("registers")}
@@ -454,7 +479,7 @@ export function SimulatedHardwarePanel({
               fontFamily: "JetBrains Mono",
             }}
           >
-            🎛 Cortex-M Registers
+            🎛 Cortex-M Simulated Peripheral Registers
           </button>
         </div>
 

@@ -102,12 +102,9 @@ export const SEED_CHALLENGES: Record<string, Challenge> = {
 High-priority triage ticket from API Gateway Security.
 Unescaped special characters in redirect parameters bypass ingress validation.
 
-#### Description
-When user inputs containing special delimiter characters (such as \`&\` or \`=\`) are passed into \`buildQueryString()\`, downstream services misinterpret the key-value structure and process unintended parameters.
+**Root Cause:** In \`sanitize.ts\`, query parameters are formatted via raw string template interpolation without \`encodeURIComponent\`. Values containing \`&\` or \`=\` split downstream parameters.
 
-#### Acceptance Criteria
-1. Ensure query parameters are properly encoded so special characters like \`&\` and \`=\` do not split or corrupt downstream parameter parsing.
-2. All unit tests pass without errors.`,
+**Fix Required:** Properly encode both query parameter keys and values using \`encodeURIComponent\`.`,
     entrypoint: 'runner.ts',
     totalTests: 3,
     files: [
@@ -306,7 +303,7 @@ else process.exit(1);`
       memoryMap: [
         { region: "Flash ROM", start: "0x08000000", end: "0x0807FFFF", desc: "512 KB User Code & ISR vectors" },
         { region: "SRAM", start: "0x20000000", end: "0x20017FFF", desc: "96 KB Ring Buffer Heap/Stack" },
-        { region: "Peripherals", start: "0x40000000", end: "0x40023FFF", desc: "USART2, DMA1, NVIC mapped I/O" }
+        { region: "Peripherals", start: "0x40000000", end: "0x40023FFF", desc: "Cortex-M Simulated UART Peripheral (USART2 @ 0x40004400, DMA1)" }
       ],
       waveformSvg: "uart-overflow"
     },
@@ -584,7 +581,7 @@ else process.exit(1);`
       memoryMap: [
         { region: "Flash", start: "0x00000000", end: "0x000FFFFF", desc: "1 MB Flash (SoftDevice + Application)" },
         { region: "RAM", start: "0x20000000", end: "0x2003FFFF", desc: "256 KB Data RAM" },
-        { region: "Peripherals", start: "0x40000000", end: "0x5003FFFF", desc: "GPIO, GPIOTE, RTC0 mapped I/O" }
+        { region: "Peripherals", start: "0x40000000", end: "0x5003FFFF", desc: "Cortex-M Simulated Peripherals (UART0 @ 0x40002000, GPIOTE @ 0x40006000, RTC0 @ 0x40008000)" }
       ],
       waveformSvg: "gpio-bounce"
     },
@@ -1616,12 +1613,13 @@ else:
 
 #### Description
 When telemetry packets stream at high data rates (> 1 kHz), the main system loop in \`telemetry_wait_for_packets()\` frequently fails to observe packet count increments and trips the hardware watchdog timer (WDT).
+Disassembly analysis reveals that GCC/Clang with \`-O2\` optimization hoists the read of \`packet_count\` out of the loop into register \`r3\`, never re-fetching the updated value from SRAM after the ISR triggers!
 
-Furthermore, atomic snapshots in \`telemetry_get_stats_atomic()\` occasionally yield corrupted 64-bit timestamps during concurrent ISR activity.
+Furthermore, atomic snapshots in \`telemetry_get_stats_atomic()\` occasionally yield corrupted 64-bit timestamps due to torn reads when the ISR fires between reading the upper and lower 32-bit words.
 
 #### Acceptance Criteria
-1. Ensure the polling loop reliably observes packet count increments under compiler optimization.
-2. Protect multi-word telemetry reads from torn reads caused by asynchronous ISR execution while properly managing interrupt state.
+1. Mark shared ISR variables as \`volatile\` so the compiler emits an \`LDR\` instruction on every iteration.
+2. Protect multi-word timestamp reads inside a critical section that saves and restores the \`PRIMASK\` state.
 3. Pass all 3 unit tests without triggering watchdog timeouts.`,
     entrypoint: 'test_runner.c',
     totalTests: 3,
@@ -1819,10 +1817,11 @@ int main(void) {
 
 #### Description
 During vehicle test drives, the CAN gateway node periodically halts with an unhandled \`HardFault_Handler\` interrupt.
-The crash occurs inside \`parse_uint16_safe()\` and \`parse_uint32_safe()\` when parsing incoming CAN OBD-II frames on the ARM Cortex-M0 microcontroller.
+The crash occurs inside \`parse_uint16_safe()\` and \`parse_uint32_safe()\`.
+Unlike Cortex-M3/M4, the ARM Cortex-M0 architecture **does not support unaligned memory access**. Dereferencing a 16-bit word pointer at an odd byte offset (e.g. \`offset = 1\`) or a 32-bit word pointer at non-multiple-of-4 address (e.g. \`offset = 3\`) generates an immediate bus fault.
 
 #### Acceptance Criteria
-1. Ensure 16-bit and 32-bit multi-byte extraction from raw byte buffers is memory-safe on Cortex-M0 hardware.
+1. Re-implement \`parse_uint16_safe()\` and \`parse_uint32_safe()\` using byte-safe extraction (e.g. \`memcpy\` or bitwise shifts) to avoid unaligned pointer dereferencing.
 2. In \`parse_obd2_frame()\`, ensure frames with \`dlc < 8\` are marked \`valid = false\`.
 3. Pass all 3 automated unit tests.`,
     entrypoint: 'test_runner.c',

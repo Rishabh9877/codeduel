@@ -574,7 +574,7 @@ export default function PricingPage() {
                   100%
                 </div>
                 <div style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase", marginTop: 4 }}>
-                  Automated LMS Export (CSV)
+                  LMS-Ready CSV Gradebook Export
                 </div>
               </div>
             </div>

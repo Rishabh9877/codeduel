@@ -91,7 +91,7 @@ export default function CampusPage() {
   const isFacultyUser = isFaculty;
   const isCohortInstructor = Boolean(activeCohort && (isAdmin || (userId && activeCohort.instructorId === userId)));
   const canManageCohort = isFacultyUser || isCohortInstructor;
-  const isDemoCohort = !session?.user && Boolean(activeCohort?.isDemo);
+  const isDemoCohort = Boolean(activeCohort?.isDemo);
 
   // Modals state
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -143,7 +143,7 @@ export default function CampusPage() {
       return;
     }
 
-    const isDemoCohort = !session?.user && Boolean(activeCohort.isDemo);
+    const isDemoCohort = Boolean(activeCohort.isDemo);
     const headers = [
       "Student Name",
       "Student ID",
@@ -880,7 +880,7 @@ export default function CampusPage() {
                 }}
               >
                 <span>📥</span>
-                <span>Download Official CSV Gradebook</span>
+                <span>LMS-Ready CSV Gradebook Export</span>
               </button>
             )}
           </div>
@@ -1599,6 +1599,22 @@ export default function CampusPage() {
                       <h3 style={{ fontSize: 13, fontWeight: 700, color: "#fff", margin: 0, textTransform: "uppercase", letterSpacing: 0.5 }}>
                         Class Roster &amp; Ranking
                       </h3>
+                      {isDemoCohort && (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            background: "rgba(245, 158, 11, 0.12)",
+                            color: "#fbbf24",
+                            padding: "2px 7px",
+                            borderRadius: 4,
+                            fontWeight: 700,
+                            border: "1px solid rgba(245, 158, 11, 0.3)",
+                            fontFamily: "'JetBrains Mono', monospace",
+                          }}
+                        >
+                          Demo Cohort Data
+                        </span>
+                      )}
                     </div>
                     <span style={{ fontSize: 11, color: "#6e6d7a" }}>
                       {activeCohort.students.length} Enrolled
@@ -1929,7 +1945,7 @@ export default function CampusPage() {
                           }}
                         >
                           <span>📥</span>
-                          <span>Export CSV</span>
+                          <span>LMS-Ready CSV Gradebook Export</span>
                         </button>
                       </div>
                     </div>
@@ -2661,6 +2677,22 @@ export default function CampusPage() {
                   <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "#fff" }}>
                     Faculty Gradebook &amp; Proctor Telemetry Audit
                   </h3>
+                  {isDemoCohort && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        background: "rgba(245, 158, 11, 0.12)",
+                        color: "#fbbf24",
+                        padding: "2px 7px",
+                        borderRadius: 4,
+                        fontWeight: 700,
+                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                    >
+                      Demo Cohort Data
+                    </span>
+                  )}
                   <span
                     style={{
                       fontSize: 10,
@@ -2799,7 +2831,7 @@ export default function CampusPage() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 20 }}>
               <span style={{ fontSize: 11, color: "#6e6d7a" }}>
-                Proctor Shield telemetry is recorded cryptographically and exports directly into LMS CSV format.
+                Proctor Shield telemetry is recorded cryptographically and exports directly into LMS-Ready CSV format.
               </span>
               <button
                 onClick={handleDownloadCSV}
@@ -2818,7 +2850,7 @@ export default function CampusPage() {
                 }}
               >
                 <span>📥</span>
-                <span>Download Official CSV Gradebook</span>
+                <span>LMS-Ready CSV Gradebook Export</span>
               </button>
             </div>
           </div>
