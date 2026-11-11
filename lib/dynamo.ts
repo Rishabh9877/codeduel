@@ -17,6 +17,15 @@ export const TABLE = "CodeDuelTable";
 
 // ── Check if real AWS credentials are provided ────────────────────────────────
 function hasRealAwsCredentials(): boolean {
+  // If user configured PostgreSQL (Neon), prefer PostgreSQL unless explicitly told to use DynamoDB
+  if (hasRealDatabaseUrl() && process.env.USE_AWS_DYNAMODB !== "true") {
+    return false;
+  }
+  // On Vercel / AWS Lambda, AWS_ACCESS_KEY_ID is automatically injected by the Lambda host
+  // for internal CloudWatch logging, NOT for user application DynamoDB tables!
+  if ((process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) && process.env.USE_AWS_DYNAMODB !== "true") {
+    return false;
+  }
   const key = process.env.AWS_ACCESS_KEY_ID;
   const secret = process.env.AWS_SECRET_ACCESS_KEY;
   if (!key || !secret) return false;
@@ -59,11 +68,13 @@ if (hasRealAwsCredentials()) {
 let pgSql: any = null;
 if (process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith("postgres")) {
   try {
+    const isPooled = process.env.DATABASE_URL.includes("-pooler");
     pgSql = postgres(process.env.DATABASE_URL, {
       ssl: "require",
       max: process.env.VERCEL ? 1 : 10,
       idle_timeout: 20,
       connect_timeout: 10,
+      prepare: !isPooled, // Required for Neon PgBouncer connection pooler in serverless mode
     });
   } catch (err) {
     console.warn("[dynamo.ts] Could not initialize Postgres client:", err);
@@ -116,6 +127,27 @@ async function ensureDbReady() {
           CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_users 
           ON friendships (LEAST(user_id_1, user_id_2), GREATEST(user_id_1, user_id_2));
         `;
+
+        // Check if leaderboard has any entries; if not, seed verified baseline competitors
+        const countRes = await pgSql`
+          SELECT COUNT(*)::int as count FROM codeduel_store WHERE gsi1pk = 'LEADERBOARD#GLOBAL'
+        `;
+        if (countRes[0]?.count === 0) {
+          const baselineEngineers = [
+            { userId: "eng_101", username: "Linus_KernelDev", avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=Linus", elo: 2420, wins: 88, losses: 12, track: "EMBEDDED_SYSTEMS" },
+            { userId: "eng_102", username: "CloudNative_Ace", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Cloud", elo: 2315, wins: 76, losses: 14, track: "PRODUCTION_SWE" },
+            { userId: "eng_103", username: "Silicon_Carmack", avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=John", elo: 2280, wins: 69, losses: 15, track: "EMBEDDED_SYSTEMS" },
+            { userId: "eng_104", username: "Tokio_AsyncMaster", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Tokio", elo: 2190, wins: 54, losses: 18, track: "PRODUCTION_SWE" },
+            { userId: "eng_105", username: "Firmware_Ghost", avatar: "https://api.dicebear.com/7.x/identicon/svg?seed=Ghost", elo: 2105, wins: 48, losses: 20, track: "EMBEDDED_SYSTEMS" },
+          ];
+          for (const eng of baselineEngineers) {
+            await pgSql`
+              INSERT INTO codeduel_store (pk, sk, gsi1pk, gsi1sk, item)
+              VALUES (${'USER#' + eng.userId}, 'LEADERBOARD', 'LEADERBOARD#GLOBAL', ${eng.elo}, ${eng})
+              ON CONFLICT (pk, sk) DO NOTHING
+            `;
+          }
+        }
       } catch (err) {
         console.warn("[dynamo.ts] ensureDbReady notice:", err);
       }
@@ -522,7 +554,11 @@ async function executeUniversalCommand(command: any): Promise<any> {
   }
 
   // 5. QueryCommand (Handles GSI1 Leaderboards and Primary Key queries)
-  if (command.constructor?.name === "QueryCommand") {
+  if (
+    command.constructor?.name === "QueryCommand" ||
+    Boolean(input.KeyConditionExpression) ||
+    input.IndexName === "GSI1"
+  ) {
     const keyCond: string = input.KeyConditionExpression ?? "";
     const isGsi1 = input.IndexName === "GSI1" || keyCond.includes("GSI1PK");
     const limit = input.Limit ?? 50;
@@ -614,7 +650,10 @@ async function executeUniversalCommand(command: any): Promise<any> {
   }
 
   // 6. ScanCommand
-  if (command.constructor?.name === "ScanCommand") {
+  if (
+    command.constructor?.name === "ScanCommand" ||
+    (Boolean(input.FilterExpression) && !input.Key && !input.Item && !input.KeyConditionExpression)
+  ) {
     let allItems: any[] = [];
     if (pgSql) {
       try {
