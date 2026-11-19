@@ -41,7 +41,7 @@ export const PRICING_PLANS: PricingPlan[] = [
       "Unlimited 1v1 matchmaking & duels",
       "Daily Practice Challenge with streak tracking",
       "1 Tier-1 Socratic AI hint per duel/practice",
-      "Access to all 12 SWE & ECE incident scenarios",
+      "Access to all 13 SWE & ECE incident scenarios",
       "Global ELO ranking & public portfolio",
       "Standard sandboxed test execution harness",
     ],
@@ -119,7 +119,7 @@ export const PRICING_FAQS = [
   },
   {
     q: "Can individual students use Codeduel for free?",
-    a: "Yes! The Free Student tier has zero credit card requirement and provides unlimited 1v1 matchmaking, the Daily Practice Challenge, and access to all 12 production incidents across both Embedded Systems and Cloud SWE tracks.",
+    a: "Yes! The Free Student tier has zero credit card requirement and provides unlimited 1v1 matchmaking, the Daily Practice Challenge, and access to all 13 production incidents across both Embedded Systems and Cloud SWE tracks.",
   },
   {
     q: "What is included in the Verified Recruiter Portfolio and Cryptographic Certificate?",

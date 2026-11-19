@@ -546,7 +546,7 @@ export default function Dashboard() {
             {/* Features preview */}
             <div style={{ marginTop: "24px", paddingTop: "20px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", textAlign: "left" }}>
               <div style={{ fontSize: "12px", color: "#8a8898", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>⚡</span> 12 Production Incidents
+                <span>⚡</span> 13 Production Incidents
               </div>
               <div style={{ fontSize: "12px", color: "#8a8898", display: "flex", alignItems: "center", gap: "6px" }}>
                 <span>🎯</span> ECE &amp; Cloud SWE Tracks

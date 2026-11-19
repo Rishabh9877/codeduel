@@ -385,7 +385,7 @@ obd2_telemetry_t parse_obd2_frame(const can_raw_frame_t *frame) {
 };
 
 async function main() {
-  console.log("=== VERIFYING SOLUTIONS FOR ALL 12 CHALLENGES ===");
+  console.log("=== VERIFYING SOLUTIONS FOR ALL 13 CHALLENGES ===");
   let allGood = true;
 
   for (const [id, challenge] of Object.entries(SEED_CHALLENGES)) {
@@ -407,7 +407,7 @@ async function main() {
   }
 
   if (allGood) {
-    console.log("\n🎉 ALL 10 CHALLENGES VERIFIED AND PASS 100%!");
+    console.log("\n🎉 ALL 13 CHALLENGES VERIFIED AND PASS 100%!");
   } else {
     console.log("\n⚠️ Some challenges failed verification.");
     process.exit(1);

@@ -230,7 +230,7 @@ export function SimulatedHardwarePanel({
     let primask = isSolved ? "0x01" : (challengeId === "embedded-interrupt-race" ? "0x00" : "0x00"); // 0x00 = interrupts unmasked (vulnerable)
 
     return (
-      <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#8b8eff", textTransform: "uppercase" }}>
             Cortex-M Simulated Peripheral &amp; SCB Registers
@@ -242,13 +242,13 @@ export function SimulatedHardwarePanel({
 
         {/* Hardware Context Peripheral Registers (e.g. UART, SPI, GPIO, CAN) */}
         {hardwareContext?.registers && hardwareContext.registers.length > 0 && (
-          <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
-            <div style={{ fontSize: 10, color: "#8a8898", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>
+          <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 8 }}>
+            <div style={{ fontSize: 10, color: "#8a8898", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em", fontWeight: 700 }}>
               Peripheral MMIO Registers ({hardwareContext.busProtocol})
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {hardwareContext.registers.map((reg, idx) => (
-                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, fontFamily: "JetBrains Mono", background: "rgba(255,255,255,0.02)", padding: "4px 8px", borderRadius: 4 }}>
+                <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 10.5, fontFamily: "JetBrains Mono", background: "rgba(255,255,255,0.02)", padding: "3px 6px", borderRadius: 4 }}>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <span style={{ color: "#38bdf8", fontWeight: 600 }}>{reg.name}</span>
                     <span style={{ color: "#6e6d7a", fontSize: 10 }}>({reg.address})</span>
@@ -264,58 +264,58 @@ export function SimulatedHardwarePanel({
         )}
 
         {/* CFSR Register Card */}
-        <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>CFSR (Configurable Fault Status)</span>
-            <span style={{ fontSize: 12, fontFamily: "JetBrains Mono", color: cfsr !== "0x00000000" ? "#f43f5e" : "#4ade80", fontWeight: 700 }}>
+        <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#fff" }}>CFSR (Configurable Fault Status)</span>
+            <span style={{ fontSize: 11, fontFamily: "JetBrains Mono", color: cfsr !== "0x00000000" ? "#f43f5e" : "#4ade80", fontWeight: 700 }}>
               {cfsr}
             </span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, fontSize: 10, fontFamily: "JetBrains Mono" }}>
-            <div style={{ background: cfsr === "0x01000000" ? "rgba(244,63,94,0.2)" : "rgba(255,255,255,0.03)", padding: 6, borderRadius: 4, color: cfsr === "0x01000000" ? "#f43f5e" : "#6e6d7a" }}>
+            <div style={{ background: cfsr === "0x01000000" ? "rgba(244,63,94,0.2)" : "rgba(255,255,255,0.03)", padding: 4, borderRadius: 4, color: cfsr === "0x01000000" ? "#f43f5e" : "#6e6d7a" }}>
               Bit 24: UNALIGNED {cfsr === "0x01000000" ? "▲ TRIP" : "0"}
             </div>
-            <div style={{ background: "rgba(255,255,255,0.03)", padding: 6, borderRadius: 4, color: "#6e6d7a" }}>
+            <div style={{ background: "rgba(255,255,255,0.03)", padding: 4, borderRadius: 4, color: "#6e6d7a" }}>
               Bit 25: DIVBYZERO 0
             </div>
-            <div style={{ background: "rgba(255,255,255,0.03)", padding: 6, borderRadius: 4, color: "#6e6d7a" }}>
+            <div style={{ background: "rgba(255,255,255,0.03)", padding: 4, borderRadius: 4, color: "#6e6d7a" }}>
               Bit 16: UNDEFINSTR 0
             </div>
           </div>
         </div>
 
         {/* HFSR & MMFAR */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
-            <div style={{ fontSize: 11, color: "#8a8898", marginBottom: 4 }}>HFSR (HardFault Status)</div>
-            <div style={{ fontSize: 13, fontFamily: "JetBrains Mono", fontWeight: 700, color: hfsr !== "0x00000000" ? "#f43f5e" : "#4ade80" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 8 }}>
+            <div style={{ fontSize: 10, color: "#8a8898", marginBottom: 2 }}>HFSR (HardFault Status)</div>
+            <div style={{ fontSize: 12, fontFamily: "JetBrains Mono", fontWeight: 700, color: hfsr !== "0x00000000" ? "#f43f5e" : "#4ade80" }}>
               {hfsr}
             </div>
-            <div style={{ fontSize: 10, color: "#6e6d7a", marginTop: 4 }}>
-              Bit 30 (FORCED): {hfsr !== "0x00000000" ? "ESCALATED" : "CLEAR"}
+            <div style={{ fontSize: 9.5, color: "#6e6d7a", marginTop: 2 }}>
+              Bit 30: {hfsr !== "0x00000000" ? "ESCALATED" : "CLEAR"}
             </div>
           </div>
 
-          <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
-            <div style={{ fontSize: 11, color: "#8a8898", marginBottom: 4 }}>MMFAR (Fault Address)</div>
-            <div style={{ fontSize: 13, fontFamily: "JetBrains Mono", fontWeight: 700, color: mmfar !== "0x00000000" ? "#f43f5e" : "#8a8898" }}>
+          <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 8 }}>
+            <div style={{ fontSize: 10, color: "#8a8898", marginBottom: 2 }}>MMFAR (Fault Address)</div>
+            <div style={{ fontSize: 12, fontFamily: "JetBrains Mono", fontWeight: 700, color: mmfar !== "0x00000000" ? "#f43f5e" : "#8a8898" }}>
               {mmfar}
             </div>
-            <div style={{ fontSize: 10, color: "#6e6d7a", marginTop: 4 }}>
-              Target: {mmfar !== "0x00000000" ? "ODD BYTE 0x20000103" : "0x00000000"}
+            <div style={{ fontSize: 9.5, color: "#6e6d7a", marginTop: 2 }}>
+              Target: {mmfar !== "0x00000000" ? "ODD 0x20000103" : "0x00000000"}
             </div>
           </div>
         </div>
 
         {/* PRIMASK Interrupt Flag */}
-        <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-            <span style={{ fontSize: 11, color: "#8a8898" }}>PRIMASK (Interrupt Mask Register)</span>
-            <span style={{ fontSize: 12, fontFamily: "JetBrains Mono", fontWeight: 700, color: isSolved ? "#4ade80" : (challengeId === "embedded-interrupt-race" ? "#f43f5e" : "#8b8eff") }}>
+        <div style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+            <span style={{ fontSize: 10, color: "#8a8898" }}>PRIMASK (Interrupt Mask Register)</span>
+            <span style={{ fontSize: 11, fontFamily: "JetBrains Mono", fontWeight: 700, color: isSolved ? "#4ade80" : (challengeId === "embedded-interrupt-race" ? "#f43f5e" : "#8b8eff") }}>
               {primask} ({isSolved ? "ATOMIC_SAFE" : (challengeId === "embedded-interrupt-race" ? "UNPROTECTED_RACE" : "NORMAL")})
             </span>
           </div>
-          <p style={{ fontSize: 11, color: "#6e6d7a", margin: 0, lineHeight: 1.4 }}>
+          <p style={{ fontSize: 10, color: "#6e6d7a", margin: 0, lineHeight: 1.35 }}>
             {isSolved
               ? "Critical section wrapped in __get_PRIMASK() / __disable_irq() — safe against torn 64-bit reads."
               : "Interrupts remain enabled during 64-bit multi-word load. Hardware ISR interrupts mid-word."}
@@ -332,8 +332,8 @@ export function SimulatedHardwarePanel({
     const irqPulsing = isFault && challengeId === "embedded-interrupt-race";
 
     return (
-      <div style={{ padding: "14px 16px", background: "#050608", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+      <div style={{ padding: "8px 12px", background: "#050608", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <span style={{ fontSize: 10, fontWeight: 700, color: "#8a8898", textTransform: "uppercase", letterSpacing: 0.5 }}>
             8-Channel Digital Logic Analyzer (40 MSPS)
           </span>
@@ -342,13 +342,13 @@ export function SimulatedHardwarePanel({
           </span>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, fontFamily: "JetBrains Mono", fontSize: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontFamily: "JetBrains Mono", fontSize: 10 }}>
           {/* CH0: SCK */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ width: 68, color: "#38bdf8", fontWeight: 700 }}>CH0: SCK</span>
-            <div style={{ flex: 1, height: 16, background: "rgba(56,189,248,0.06)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
-              <svg width="100%" height="16">
-                <path d="M0,13 L20,13 L20,3 L40,3 L40,13 L60,13 L60,3 L80,3 L80,13 L100,13 L100,3 L120,3 L120,13 L140,13 L140,3 L160,3 L160,13 L180,13 L180,3 L200,3 L200,13 L220,13 L220,3 L240,3 L240,13 L260,13 L260,3 L280,3 L280,13 L300,13 L300,3 L320,3 L320,13 L340,13 L340,3 L360,3 L360,13 L380,13 L380,3 L400,3 L400,13" fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+            <div style={{ flex: 1, height: 14, background: "rgba(56,189,248,0.06)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+              <svg width="100%" height="14">
+                <path d="M0,11 L20,11 L20,2 L40,2 L40,11 L60,11 L60,2 L80,2 L80,11 L100,11 L100,2 L120,2 L120,11 L140,11 L140,2 L160,2 L160,11 L180,11 L180,2 L200,2 L200,11 L220,11 L220,2 L240,2 L240,11 L260,11 L260,2 L280,2 L280,11 L300,11 L300,2 L320,2 L320,11 L340,11 L340,2 L360,2 L360,11 L380,11 L380,2 L400,2 L400,11" fill="none" stroke="#38bdf8" strokeWidth="1.5" />
               </svg>
             </div>
           </div>
@@ -356,9 +356,9 @@ export function SimulatedHardwarePanel({
           {/* CH1: MOSI */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ width: 68, color: "#c084fc", fontWeight: 700 }}>CH1: MOSI</span>
-            <div style={{ flex: 1, height: 16, background: "rgba(192,132,252,0.06)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
-              <svg width="100%" height="16">
-                <path d="M0,13 L40,13 L40,3 L90,3 L90,13 L150,13 L150,3 L220,3 L220,13 L310,13 L310,3 L370,3 L370,13 L400,13" fill="none" stroke="#c084fc" strokeWidth="1.5" />
+            <div style={{ flex: 1, height: 14, background: "rgba(192,132,252,0.06)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+              <svg width="100%" height="14">
+                <path d="M0,11 L40,11 L40,2 L90,2 L90,11 L150,11 L150,2 L220,2 L220,11 L310,11 L310,2 L370,2 L370,11 L400,11" fill="none" stroke="#c084fc" strokeWidth="1.5" />
               </svg>
             </div>
           </div>
@@ -366,12 +366,12 @@ export function SimulatedHardwarePanel({
           {/* CH4: EXT_INT0 */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ width: 68, color: irqPulsing ? "#f43f5e" : "#4ade80", fontWeight: 700 }}>CH4: INT0</span>
-            <div style={{ flex: 1, height: 16, background: irqPulsing ? "rgba(244,63,94,0.15)" : "rgba(74,222,128,0.06)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
-              <svg width="100%" height="16">
+            <div style={{ flex: 1, height: 14, background: irqPulsing ? "rgba(244,63,94,0.15)" : "rgba(74,222,128,0.06)", borderRadius: 3, position: "relative", overflow: "hidden" }}>
+              <svg width="100%" height="14">
                 {irqPulsing ? (
-                  <path d="M0,13 L30,13 L30,3 L50,3 L50,13 L80,13 L80,3 L100,3 L100,13 L140,13 L140,3 L155,3 L155,13 L230,13 L230,3 L250,3 L250,13 L350,13 L350,3 L370,3 L370,13" fill="none" stroke="#f43f5e" strokeWidth="2" />
+                  <path d="M0,11 L30,11 L30,2 L50,2 L50,11 L80,11 L80,2 L100,2 L100,11 L140,11 L140,2 L155,2 L155,11 L230,11 L230,2 L250,2 L250,11 L350,11 L350,2 L370,2 L370,11" fill="none" stroke="#f43f5e" strokeWidth="2" />
                 ) : (
-                  <path d="M0,13 L120,13 L120,3 L140,3 L140,13 L280,13 L280,3 L300,3 L300,13 L400,13" fill="none" stroke="#4ade80" strokeWidth="1.5" />
+                  <path d="M0,11 L120,11 L120,2 L140,2 L140,11 L280,11 L280,2 L300,2 L300,11 L400,11" fill="none" stroke="#4ade80" strokeWidth="1.5" />
                 )}
               </svg>
             </div>
@@ -380,10 +380,10 @@ export function SimulatedHardwarePanel({
           {/* CH7: CAN_FAULT */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ width: 68, color: canFaultHigh ? "#f43f5e" : "#6e6d7a", fontWeight: 700 }}>CH7: FAULT</span>
-            <div style={{ flex: 1, height: 16, background: canFaultHigh ? "rgba(244,63,94,0.2)" : "rgba(255,255,255,0.02)", borderRadius: 3, position: "relative" }}>
-              <svg width="100%" height="16">
+            <div style={{ flex: 1, height: 14, background: canFaultHigh ? "rgba(244,63,94,0.2)" : "rgba(255,255,255,0.02)", borderRadius: 3, position: "relative" }}>
+              <svg width="100%" height="14">
                 <path
-                  d={canFaultHigh ? "M0,13 L80,13 L80,3 L400,3" : "M0,13 L400,13"}
+                  d={canFaultHigh ? "M0,11 L80,11 L80,2 L400,2" : "M0,11 L400,11"}
                   fill="none"
                   stroke={canFaultHigh ? "#f43f5e" : "#4a4860"}
                   strokeWidth="2"
@@ -399,36 +399,36 @@ export function SimulatedHardwarePanel({
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#0a0a10", color: "#e8e6f0" }}>
       {/* ── CLOSED-LOOP STATUS HEADER ─────────────────────────────────────── */}
-      <div style={{ padding: "12px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#08080d" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+      <div style={{ padding: "8px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "#08080d" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 10, fontWeight: 800, color: "#fbbf24", background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)", padding: "2px 8px", borderRadius: 4, letterSpacing: "0.04em", textTransform: "uppercase" }}>
               Simulated Peripheral &amp; Signal View
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#fff", fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff", fontFamily: "'JetBrains Mono', monospace" }}>
               {hardwareContext.mcu}
             </span>
           </div>
 
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 10, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "2px 6px", color: "#8a8898", fontFamily: "JetBrains Mono" }}>
+            <span style={{ fontSize: 9.5, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, padding: "2px 6px", color: "#8a8898", fontFamily: "JetBrains Mono" }}>
               {hardwareContext.clockSpeed}
             </span>
-            <span style={{ fontSize: 10, background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.25)", borderRadius: 4, padding: "2px 6px", color: "#38bdf8", fontFamily: "JetBrains Mono" }}>
+            <span style={{ fontSize: 9.5, background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.25)", borderRadius: 4, padding: "2px 6px", color: "#38bdf8", fontFamily: "JetBrains Mono" }}>
               {hardwareContext.busProtocol}
             </span>
 
             {/* LIVE CLOSED-LOOP EXECUTION BADGE */}
             {isSolved ? (
-              <span style={{ fontSize: 10, background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.4)", color: "#4ade80", padding: "2px 8px", borderRadius: 4, fontWeight: 800, fontFamily: "JetBrains Mono" }}>
-                ✓ HARDWARE TELEMETRY VERIFIED — 0 FAULTS
+              <span style={{ fontSize: 9.5, background: "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.4)", color: "#4ade80", padding: "2px 7px", borderRadius: 4, fontWeight: 800, fontFamily: "JetBrains Mono" }}>
+                ✓ HARDWARE VERIFIED — 0 FAULTS
               </span>
             ) : isRunning ? (
-              <span style={{ fontSize: 10, background: "rgba(56,189,248,0.15)", border: "1px solid rgba(56,189,248,0.4)", color: "#38bdf8", padding: "2px 8px", borderRadius: 4, fontWeight: 800, fontFamily: "JetBrains Mono" }}>
-                ⏳ SAMPLING PISTON SANDBOX...
+              <span style={{ fontSize: 9.5, background: "rgba(56,189,248,0.15)", border: "1px solid rgba(56,189,248,0.4)", color: "#38bdf8", padding: "2px 7px", borderRadius: 4, fontWeight: 800, fontFamily: "JetBrains Mono" }}>
+                ⏳ SAMPLING SANDBOX...
               </span>
             ) : (
-              <span style={{ fontSize: 10, background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", color: "#f43f5e", padding: "2px 8px", borderRadius: 4, fontWeight: 800, fontFamily: "JetBrains Mono" }}>
+              <span style={{ fontSize: 9.5, background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.4)", color: "#f43f5e", padding: "2px 7px", borderRadius: 4, fontWeight: 800, fontFamily: "JetBrains Mono" }}>
                 ▲ FAULT ACTIVE ({testsPassed}/{totalTests} TESTS)
               </span>
             )}
@@ -436,9 +436,9 @@ export function SimulatedHardwarePanel({
         </div>
 
         {/* Observed Failure Banner */}
-        <div style={{ background: isSolved ? "rgba(74,222,128,0.06)" : "rgba(244,63,94,0.08)", border: `1px solid ${isSolved ? "rgba(74,222,128,0.25)" : "rgba(244,63,94,0.25)"}`, borderRadius: 6, padding: "7px 12px", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 12 }}>{isSolved ? "✅" : "⚠️"}</span>
-          <div style={{ fontSize: 11, color: isSolved ? "#bbf7d0" : "#fecdd3", lineHeight: 1.4 }}>
+        <div style={{ background: isSolved ? "rgba(74,222,128,0.06)" : "rgba(244,63,94,0.08)", border: `1px solid ${isSolved ? "rgba(74,222,128,0.25)" : "rgba(244,63,94,0.25)"}`, borderRadius: 6, padding: "5px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11 }}>{isSolved ? "✅" : "⚠️"}</span>
+          <div style={{ fontSize: 10.5, color: isSolved ? "#bbf7d0" : "#fecdd3", lineHeight: 1.35 }}>
             {isSolved
               ? "All unit tests passed. MMIO fault registers cleared, clock domain stabilized at target frequency."
               : hardwareContext.observedFailure}
@@ -447,7 +447,7 @@ export function SimulatedHardwarePanel({
       </div>
 
       {/* ── BENCH CONTROLS TOOLBAR ────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px", background: "#0c0d16", borderBottom: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", background: "#0c0d16", borderBottom: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap", gap: 6 }}>
         <div style={{ display: "flex", gap: 4 }}>
           <button
             onClick={() => setActiveTab("waveform")}
@@ -456,9 +456,9 @@ export function SimulatedHardwarePanel({
               border: "none",
               borderBottom: activeTab === "waveform" ? "2px solid #fbbf24" : "2px solid transparent",
               color: activeTab === "waveform" ? "#fbbf24" : "#8a8898",
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: 700,
-              padding: "6px 12px",
+              padding: "4px 8px",
               cursor: "pointer",
               fontFamily: "JetBrains Mono",
             }}
@@ -472,9 +472,9 @@ export function SimulatedHardwarePanel({
               border: "none",
               borderBottom: activeTab === "registers" ? "2px solid #8b8eff" : "2px solid transparent",
               color: activeTab === "registers" ? "#8b8eff" : "#8a8898",
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: 700,
-              padding: "6px 12px",
+              padding: "4px 8px",
               cursor: "pointer",
               fontFamily: "JetBrains Mono",
             }}
@@ -484,12 +484,12 @@ export function SimulatedHardwarePanel({
         </div>
 
         {/* Oscilloscope Interactive Dividers */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, fontFamily: "JetBrains Mono" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10, fontFamily: "JetBrains Mono" }}>
           {/* Timebase */}
           <select
             value={timebase}
             onChange={(e) => setTimebase(e.target.value)}
-            style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.15)", color: "#fbbf24", padding: "3px 6px", borderRadius: 4, fontSize: 10, fontFamily: "inherit" }}
+            style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.15)", color: "#fbbf24", padding: "2px 5px", borderRadius: 4, fontSize: 10, fontFamily: "inherit" }}
           >
             <option value="50µs/div">50µs/div</option>
             <option value="100µs/div">100µs/div</option>
@@ -502,7 +502,7 @@ export function SimulatedHardwarePanel({
           <select
             value={voltDiv}
             onChange={(e) => setVoltDiv(e.target.value)}
-            style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.15)", color: "#38bdf8", padding: "3px 6px", borderRadius: 4, fontSize: 10, fontFamily: "inherit" }}
+            style={{ background: "#06070a", border: "1px solid rgba(255,255,255,0.15)", color: "#38bdf8", padding: "2px 5px", borderRadius: 4, fontSize: 10, fontFamily: "inherit" }}
           >
             <option value="500mV/div">500mV/div</option>
             <option value="1V/div">1V/div</option>
@@ -516,7 +516,7 @@ export function SimulatedHardwarePanel({
               background: isFrozen ? "#fbbf24" : "rgba(255,255,255,0.06)",
               color: isFrozen ? "#000" : "#e8e6f0",
               border: "1px solid rgba(255,255,255,0.15)",
-              padding: "3px 8px",
+              padding: "2px 6px",
               borderRadius: 4,
               cursor: "pointer",
               fontWeight: 700,
@@ -531,7 +531,7 @@ export function SimulatedHardwarePanel({
               background: injectedGlitch ? "#f43f5e" : "rgba(244,63,94,0.1)",
               color: injectedGlitch ? "#fff" : "#f43f5e",
               border: "1px solid rgba(244,63,94,0.3)",
-              padding: "3px 8px",
+              padding: "2px 6px",
               borderRadius: 4,
               cursor: "pointer",
               fontWeight: 700,
@@ -547,11 +547,11 @@ export function SimulatedHardwarePanel({
         {activeTab === "waveform" && (
           <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
             {/* HTML5 Canvas DSO */}
-            <div style={{ position: "relative", width: "100%", height: 160, background: "#070b0e" }}>
+            <div style={{ position: "relative", width: "100%", height: 130, background: "#070b0e" }}>
               <canvas
                 ref={canvasRef}
                 width={540}
-                height={160}
+                height={130}
                 style={{ width: "100%", height: "100%", display: "block" }}
               />
             </div>

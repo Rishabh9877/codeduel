@@ -609,15 +609,18 @@ export default function MatchArena() {
       )}
       {/* ── TOP HUD NAVIGATION ─────────────────────────────────────────────── */}
       <header style={{
-        height: 52,
+        height: 50,
         background: "#0c0d14",
         borderBottom: "1px solid rgba(255,255,255,0.08)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 20px",
-        flexShrink: 0
-      }}>
+        padding: "0 16px",
+        flexShrink: 0,
+        overflowX: "auto",
+        whiteSpace: "nowrap",
+        gap: 12
+      }} className="overflow-x-auto">
         {/* Left: Brand & Track */}
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <Link href="/dashboard" style={{ fontWeight: 800, fontSize: 16, color: "#fff", textDecoration: "none", letterSpacing: "-0.02em" }}>
@@ -937,19 +940,20 @@ export default function MatchArena() {
 
       {/* ── REAL-TIME OPPONENT TELEMETRY TIMELINE ──────────────────────────── */}
       <div style={{
-        height: 40,
+        height: 38,
         background: "#08090f",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0 18px",
+        padding: "0 16px",
         fontSize: 11,
         fontFamily: "'JetBrains Mono', monospace",
         flexShrink: 0,
         gap: 12,
-        overflowX: "auto"
-      }}>
+        overflowX: "auto",
+        whiteSpace: "nowrap"
+      }} className="overflow-x-auto">
         {/* YOU Telemetry Track */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <span style={{ color: "#4ade80", fontWeight: 700, display: "flex", alignItems: "center", gap: 5 }}>
@@ -1000,8 +1004,8 @@ export default function MatchArena() {
           overflowY: "auto"
         }}>
           {/* Header */}
-          <div style={{ padding: "14px 18px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            <h1 style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 6 }}>
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <h1 style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
               {challenge.title}
             </h1>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -1015,7 +1019,7 @@ export default function MatchArena() {
             </div>
 
             {/* Left Panel Tabs: Ticket Brief vs Triage Checklist vs Hardware */}
-            <div style={{ display: "flex", gap: 4, marginTop: 10, background: "rgba(255,255,255,0.04)", padding: 2, borderRadius: 6 }}>
+            <div style={{ display: "flex", gap: 4, marginTop: 6, background: "rgba(255,255,255,0.04)", padding: 2, borderRadius: 6 }}>
               <button
                 onClick={() => setLeftTab("ticket")}
                 style={{
@@ -1024,8 +1028,8 @@ export default function MatchArena() {
                   color: leftTab === "ticket" ? "#fff" : "#8a8898",
                   border: "none",
                   borderRadius: 4,
-                  padding: "5px 8px",
-                  fontSize: 11,
+                  padding: "4px 6px",
+                  fontSize: 10.5,
                   fontWeight: 700,
                   cursor: "pointer",
                 }}
@@ -1040,13 +1044,13 @@ export default function MatchArena() {
                   color: leftTab === "checklist" ? "#8b8eff" : "#8a8898",
                   border: "none",
                   borderRadius: 4,
-                  padding: "5px 8px",
-                  fontSize: 11,
+                  padding: "4px 6px",
+                  fontSize: 10.5,
                   fontWeight: 700,
                   cursor: "pointer",
                 }}
               >
-                ✅ Triage Checklist
+                ✅ Checklist
               </button>
               {challenge.hardwareContext && (
                 <button
@@ -1057,13 +1061,13 @@ export default function MatchArena() {
                     color: leftTab === "hardware" ? "#fbbf24" : "#8a8898",
                     border: "none",
                     borderRadius: 4,
-                    padding: "5px 8px",
-                    fontSize: 11,
+                    padding: "4px 6px",
+                    fontSize: 10.5,
                     fontWeight: 700,
                     cursor: "pointer",
                   }}
                 >
-                  ⚡ Simulated Peripheral &amp; Signal View
+                  ⚡ Signal / MMIO
                 </button>
               )}
             </div>

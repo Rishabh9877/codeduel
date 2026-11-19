@@ -24,7 +24,7 @@ const execFileAsync = promisify(execFile);
 // ── Backend Configuration ────────────────────────────────────────────────────
 
 const PISTON_URL = process.env.PISTON_URL ?? 'https://emkc.org/api/v2/piston';
-const PISTON_TIMEOUT_MS = 15_000;
+const PISTON_TIMEOUT_MS = 5_000;
 const MAX_TOTAL_CODE_SIZE_BYTES = 200_000;
 
 const PISTON_LANGUAGE_MAP: Record<string, { language: string; version: string }> = {
@@ -327,6 +327,117 @@ async function executePythonLocally(
   }
 }
 
+// ── Deterministic In-Engine Ring Buffer Verifier (Piston 503 Safety Net) ────
+
+export function verifyRingBufferInTypeScript(cCode: string): ChallengeExecutionResult {
+  const start = Date.now();
+  try {
+    const jsCode = cCode
+      .replace(/#include[^\n]*/g, "")
+      .replace(/\b(static|inline|volatile|const|extern)\b/g, "")
+      .replace(/\bRingBuffer\s*\*?/g, "")
+      .replace(/\buint8_t\s*\*?/g, "")
+      .replace(/\bbool\s+/g, "function ")
+      .replace(/\bvoid\s+/g, "function ")
+      .replace(/->/g, ".")
+      .replace(/\*(\w+)\s*=/g, "$1.val =")
+      .replace(/\bRB_SIZE\b/g, "8");
+
+    const fn = new Function(`
+      ${jsCode}
+      return { rb_init, rb_is_full, rb_is_empty, rb_write, rb_read };
+    `);
+
+    const { rb_init, rb_is_full, rb_is_empty, rb_write, rb_read } = fn();
+
+    function createRb() {
+      const rb = { buffer: new Array(8).fill(0), head: 0, tail: 0, count: 0 };
+      rb_init(rb);
+      return rb;
+    }
+
+    let passed = 0;
+    const total = 3;
+    const testResults: Array<{ name: string; passed: boolean }> = [];
+    const logs: string[] = [];
+
+    // Test 1: Empty and Simple Write
+    const rb1 = createRb();
+    if (rb_is_empty(rb1) && !rb_is_full(rb1)) {
+      rb_write(rb1, 0xAA);
+      const d = { val: 0 };
+      rb_read(rb1, d);
+      if (d.val === 0xAA && rb_is_empty(rb1)) {
+        logs.push("[PASS] TEST_1: FIFO Read/Write");
+        testResults.push({ name: "TEST_1: FIFO Read/Write", passed: true });
+        passed++;
+      } else {
+        logs.push("[FAIL] TEST_1: Read incorrect value or buffer not empty");
+        testResults.push({ name: "TEST_1: FIFO Read/Write", passed: false });
+      }
+    } else {
+      logs.push("[FAIL] TEST_1: Initial state check failed (empty or reported full)");
+      testResults.push({ name: "TEST_1: FIFO Read/Write", passed: false });
+    }
+
+    // Test 2: Full Buffer Saturation
+    const rb2 = createRb();
+    for (let i = 0; i < 8; i++) rb_write(rb2, i);
+    if (rb_is_full(rb2) && !rb_write(rb2, 0xFF)) {
+      logs.push("[PASS] TEST_2: Saturation Boundary Check");
+      testResults.push({ name: "TEST_2: Saturation Boundary Check", passed: true });
+      passed++;
+    } else {
+      logs.push("[FAIL] TEST_2: Overwrote full buffer");
+      testResults.push({ name: "TEST_2: Saturation Boundary Check", passed: false });
+    }
+
+    // Test 3: Wrap-Around Boundary Execution
+    const rb3 = createRb();
+    for (let i = 0; i < 6; i++) rb_write(rb3, i);
+    const dummy = { val: 0 };
+    for (let i = 0; i < 4; i++) rb_read(rb3, dummy);
+    for (let i = 0; i < 4; i++) rb_write(rb3, 0x10 + i);
+    const extracted = { val: 0 };
+    rb_read(rb3, extracted);
+    if (extracted.val === 4) {
+      logs.push("[PASS] TEST_3: Pointer Wrap-Around");
+      testResults.push({ name: "TEST_3: Pointer Wrap-Around", passed: true });
+      passed++;
+    } else {
+      logs.push("[FAIL] TEST_3: Wrap-Around Corruption");
+      testResults.push({ name: "TEST_3: Pointer Wrap-Around", passed: false });
+    }
+
+    logs.push(`SUMMARY: ${passed}/${total} PASSED`);
+    return {
+      passed,
+      total,
+      allPassed: passed === total,
+      stdout: logs.join("\n"),
+      stderr: "",
+      runtimeMs: Date.now() - start,
+      status: passed === total ? "accepted" : "wrong_answer",
+      testResults,
+    };
+  } catch (err: any) {
+    return {
+      passed: 0,
+      total: 3,
+      allPassed: false,
+      stdout: "",
+      stderr: String(err?.message || err),
+      runtimeMs: Date.now() - start,
+      status: "compile_error",
+      testResults: [
+        { name: "TEST_1: FIFO Read/Write", passed: false },
+        { name: "TEST_2: Saturation Boundary Check", passed: false },
+        { name: "TEST_3: Pointer Wrap-Around", passed: false },
+      ],
+    };
+  }
+}
+
 // ── Core Executor ────────────────────────────────────────────────────────────
 
 export async function executeChallenge(
@@ -423,6 +534,12 @@ export async function executeChallenge(
     } catch (_) {
       // Remote Piston failed or timed out — fallback to built-in execution
     }
+  }
+
+  // Piston Safety Net: If Piston timed out or failed on embedded-ring-buffer, run deterministic TypeScript verifier
+  if (challenge.id === 'embedded-ring-buffer') {
+    const userCCode = userFiles['ring_buffer.c'] ?? challenge.files.find((f) => f.name === 'ring_buffer.c')?.content ?? '';
+    return verifyRingBufferInTypeScript(userCCode);
   }
 
   // 5. Built-in Fallback Execution (Development Only)
