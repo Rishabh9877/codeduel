@@ -153,7 +153,7 @@ export default function ContactPage() {
                     type="text"
                     value={form.institution}
                     onChange={(e) => setForm({ ...form, institution: e.target.value })}
-                    placeholder="e.g. Stanford, MIT, IIT, Berkeley, or Company"
+                    placeholder="e.g. PEC Chandigarh, IIT, or Organization"
                     style={{
                       width: "100%",
                       background: "rgba(0,0,0,0.4)",
@@ -219,13 +219,13 @@ export default function ContactPage() {
           <div>
             <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "24px", marginBottom: "20px" }}>
               <div style={{ fontSize: "12px", fontWeight: 700, color: "#8b8eff", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>
-                Global Headquarters
+                Headquarters
               </div>
-              <h4 style={{ fontSize: "15px", fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>Codeduel Inc.</h4>
+              <h4 style={{ fontSize: "15px", fontWeight: 700, color: "#fff", margin: "0 0 6px" }}>Codeduel</h4>
               <p style={{ fontSize: "13px", color: "#8a8898", lineHeight: 1.6, margin: 0 }}>
                 Engineering Division &amp; Academic Partnerships<br />
-                Global Remote · Silicon Valley &amp; Partner Campuses<br />
-                Worldwide
+                Chandigarh, India · Partner Campuses<br />
+                Global Remote Operations
               </p>
             </div>
 

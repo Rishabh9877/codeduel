@@ -1282,7 +1282,7 @@ export default function LandingPage() {
               We train students and developers through 1v1 dynamic software and ECE duels. Real production codebases, zero textbook puzzle memorization.
             </p>
             <div style={{ fontSize: "12px", color: "var(--muted2)", fontFamily: "'JetBrains Mono', monospace" }}>
-              📍 Global Engineering Network · Remote &amp; Universities Everywhere
+              📍 Chandigarh, India · Engineering Campuses &amp; Global Remote
             </div>
           </div>
 

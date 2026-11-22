@@ -87,8 +87,8 @@ export default function PrivacyPolicyPage() {
           </p>
           <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", padding: "16px 20px", marginTop: "12px", fontFamily: "'JetBrains Mono', monospace", fontSize: "13px" }}>
             <p style={{ margin: "0 0 6px", color: "#fff", fontWeight: 600 }}>Grievance Officer, Codeduel</p>
-            <p style={{ margin: "0 0 4px", color: "#8a8898" }}>Codeduel Inc., Legal &amp; Compliance</p>
-            <p style={{ margin: "0 0 4px", color: "#8a8898" }}>San Francisco, CA &amp; Remote Operations</p>
+            <p style={{ margin: "0 0 4px", color: "#8a8898" }}>Codeduel, Legal &amp; Compliance</p>
+            <p style={{ margin: "0 0 4px", color: "#8a8898" }}>Chandigarh, India &amp; Remote Operations</p>
             <p style={{ margin: 0, color: "#8b8eff" }}>Email: privacy@codeduel.com / team@codeduel.com</p>
           </div>
         </section>

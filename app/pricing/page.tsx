@@ -737,7 +737,7 @@ export default function PricingPage() {
                     <input
                       type="email"
                       required
-                      placeholder="e.g. prof.smith@university.edu"
+                      placeholder="e.g. prof.sharma@pec.edu.in"
                       value={pilotForm.email}
                       onChange={(e) => setPilotForm({ ...pilotForm, email: e.target.value })}
                       style={{

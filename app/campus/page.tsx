@@ -2338,7 +2338,7 @@ export default function CampusPage() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Stanford University"
+                    placeholder="e.g. Punjab Engineering College (PEC), Chandigarh"
                     value={createForm.institution}
                     onChange={(e) => setCreateForm({ ...createForm, institution: e.target.value })}
                     style={{
