@@ -11,6 +11,10 @@ export interface PricingPlan {
   annualPriceMonthlyUSD: number;
   periodTextINR?: string;
   periodTextUSD?: string;
+  monthlyPeriodTextINR?: string;
+  monthlyPeriodTextUSD?: string;
+  annualPeriodTextINR?: string;
+  annualPeriodTextUSD?: string;
   description: string;
   duelsPerDay: number; // -1 for unlimited
   aiHintsPerChallenge: number;
@@ -20,6 +24,10 @@ export interface PricingPlan {
   features: string[];
   ctaTextINR: string;
   ctaTextUSD: string;
+  monthlyCtaTextINR?: string;
+  monthlyCtaTextUSD?: string;
+  annualCtaTextINR?: string;
+  annualCtaTextUSD?: string;
   highlighted?: boolean;
 }
 
@@ -47,6 +55,10 @@ export const PRICING_PLANS: PricingPlan[] = [
     ],
     ctaTextINR: "Current Plan",
     ctaTextUSD: "Current Plan",
+    monthlyCtaTextINR: "Current Plan",
+    monthlyCtaTextUSD: "Current Plan",
+    annualCtaTextINR: "Current Plan",
+    annualCtaTextUSD: "Current Plan",
   },
   {
     id: "PRO",
@@ -58,6 +70,10 @@ export const PRICING_PLANS: PricingPlan[] = [
     annualPriceMonthlyUSD: 15, // $15/mo billed annually
     periodTextINR: "₹1,200 / year billed annually",
     periodTextUSD: "$180 / year billed annually",
+    monthlyPeriodTextINR: "Billed monthly (₹100/mo) · Cancel anytime",
+    monthlyPeriodTextUSD: "$19 / month billed monthly · Cancel anytime",
+    annualPeriodTextINR: "₹1,200 / year billed annually (₹100/mo)",
+    annualPeriodTextUSD: "$180 / year ($15/mo billed annually · Save 21%)",
     description: "For competitive developers & engineering students targeting top product & embedded systems roles.",
     duelsPerDay: -1, // Unlimited
     aiHintsPerChallenge: 3,
@@ -76,17 +92,25 @@ export const PRICING_PLANS: PricingPlan[] = [
     ],
     ctaTextINR: "Subscribe to Pro (₹100/mo)",
     ctaTextUSD: "Subscribe to Pro ($19/mo)",
+    monthlyCtaTextINR: "Subscribe to Pro (₹100/mo)",
+    monthlyCtaTextUSD: "Subscribe to Pro ($19/mo)",
+    annualCtaTextINR: "Subscribe to Pro (₹100/mo)",
+    annualCtaTextUSD: "Subscribe to Pro ($15/mo)",
   },
   {
     id: "CAMPUS",
     name: "Campus Department License",
     badge: "B2B INSTITUTIONAL LICENSING",
     monthlyPriceINR: 40000,
-    annualPriceMonthlyINR: 25000, // ₹1,00,000 / year (or ₹40,000 / semester)
+    annualPriceMonthlyINR: 25000, // ₹1,00,000 / academic year (or ₹40,000 / single term)
     monthlyPriceUSD: 499,
     annualPriceMonthlyUSD: 399,
     periodTextINR: "₹40,000 / semester or ₹1,00,000 / year",
     periodTextUSD: "$499 / semester (unlimited students)",
+    monthlyPeriodTextINR: "₹40,000 / semester (single-term commitment)",
+    monthlyPeriodTextUSD: "$499 / semester (single-term commitment)",
+    annualPeriodTextINR: "₹1,00,000 / academic year (₹25,000/term · Save 37%)",
+    annualPeriodTextUSD: "$1,596 / academic year ($399/term · Save 20%)",
     description: "For university engineering departments (ECE & CS), professors, and lab TAs modernizing course labs.",
     duelsPerDay: -1,
     aiHintsPerChallenge: 3,
@@ -105,6 +129,10 @@ export const PRICING_PLANS: PricingPlan[] = [
     ],
     ctaTextINR: "Request Campus License (₹40,000/term)",
     ctaTextUSD: "Request Campus License ($499/term)",
+    monthlyCtaTextINR: "Request Campus License (₹40,000/term)",
+    monthlyCtaTextUSD: "Request Campus License ($499/term)",
+    annualCtaTextINR: "Request Campus License (₹25,000/term)",
+    annualCtaTextUSD: "Request Campus License ($399/term)",
   },
 ];
 

@@ -73,7 +73,7 @@ Diagnose high-throughput distributed systems failures and security vulnerabiliti
 - **Cryptographic Credential Verification (`/verify/[slug]`)**: Instant credential verification for completed track certifications.
 
 ### 5. SaaS Pricing & Admin Metrics (`/pricing` & `/admin/metrics`)
-- **Tiered Model**: Free Student Tier, Campus Pro Tier ($19/mo or $15/seat/term), and Enterprise Department Tier.
+- **Tiered Model**: Student Free Tier, Pro Engineer Tier (₹100/mo or $19/mo), and Campus Department License (₹40,000/term or ₹1,00,000/year).
 - **Usage Metrics Dashboard**: Live monitoring of active duels, daily submissions, API latency, and quota consumption.
 
 ---

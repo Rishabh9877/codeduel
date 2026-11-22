@@ -309,7 +309,7 @@ export default function PricingPage() {
                   fontFamily: "inherit",
                 }}
               >
-                Annual (Save up to 25%)
+                Annual (Save up to 37%)
               </button>
             </div>
           </div>
@@ -327,11 +327,16 @@ export default function PricingPage() {
         >
           {PRICING_PLANS.map((plan) => {
             const isINR = currency === "INR";
+            const isAnnual = billingCycle === "annual";
             const price = isINR
-              ? (billingCycle === "annual" ? plan.annualPriceMonthlyINR : plan.monthlyPriceINR)
-              : (billingCycle === "annual" ? plan.annualPriceMonthlyUSD : plan.monthlyPriceUSD);
-            const periodText = isINR ? plan.periodTextINR : plan.periodTextUSD;
-            const ctaText = isINR ? plan.ctaTextINR : plan.ctaTextUSD;
+              ? (isAnnual ? plan.annualPriceMonthlyINR : plan.monthlyPriceINR)
+              : (isAnnual ? plan.annualPriceMonthlyUSD : plan.monthlyPriceUSD);
+            const periodText = isINR
+              ? (isAnnual ? (plan.annualPeriodTextINR || plan.periodTextINR) : (plan.monthlyPeriodTextINR || plan.periodTextINR))
+              : (isAnnual ? (plan.annualPeriodTextUSD || plan.periodTextUSD) : (plan.monthlyPeriodTextUSD || plan.periodTextUSD));
+            const ctaText = isINR
+              ? (isAnnual ? (plan.annualCtaTextINR || plan.ctaTextINR) : (plan.monthlyCtaTextINR || plan.ctaTextINR))
+              : (isAnnual ? (plan.annualCtaTextUSD || plan.ctaTextUSD) : (plan.monthlyCtaTextUSD || plan.ctaTextUSD));
 
             return (
               <div
@@ -435,7 +440,9 @@ export default function PricingPage() {
                   } else if (plan.id === "FREE" && userTier === "PRO") {
                     btnText = "Switch to Free";
                   } else if (plan.id === "PRO") {
-                    btnText = isINR ? "⚡ Upgrade to Pro (₹100/mo)" : "⚡ Upgrade to Pro ($19/mo)";
+                    btnText = isINR
+                      ? "⚡ Upgrade to Pro (₹100/mo)"
+                      : (isAnnual ? "⚡ Upgrade to Pro ($15/mo)" : "⚡ Upgrade to Pro ($19/mo)");
                   }
 
                   return (

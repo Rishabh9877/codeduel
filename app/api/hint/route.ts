@@ -210,7 +210,7 @@ export async function POST(req: Request) {
     if (subTier === "FREE") {
       return NextResponse.json(
         {
-          error: "Free Student accounts include 1 AI coach hint per challenge. Upgrade to Pro Competitor for deep Tier 2 and Tier 3 architectural guidance.",
+          error: "Free Student accounts include 1 AI coach hint per challenge. Upgrade to Pro Engineer for deep Tier 2 and Tier 3 architectural guidance.",
           requiresPro: true,
           hintsUsed,
         },
