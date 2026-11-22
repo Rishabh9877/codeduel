@@ -26,8 +26,10 @@ export default function AppNavbar({
   const { data: session, status } = useSession();
   const { role, setRole, isIndividual, isStudent, isFaculty, isAdmin, canAccessCampus } = useUserRole();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleMatchClick = () => {
+    setMobileMenuOpen(false);
     if (onFindMatch) {
       onFindMatch();
     } else {
@@ -36,382 +38,370 @@ export default function AppNavbar({
   };
 
   return (
-    <nav
-      style={{
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-        height: 54,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 24px",
-        background: "rgba(6, 7, 12, 0.85)",
-        backdropFilter: "blur(20px)",
-        borderBottom: "1px solid rgba(255, 255, 255, 0.07)",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      {/* Brand & Left Navigation */}
-      <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-        <Link
-          href={status === "authenticated" ? "/dashboard" : "/"}
-          style={{
-            fontSize: 15,
-            fontWeight: 800,
-            color: "#fff",
-            textDecoration: "none",
-            letterSpacing: "-0.02em",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <span>Codeduel</span>
-          {isAdmin && (
-            <span
-              style={{
-                fontSize: 9,
-                fontWeight: 800,
-                padding: "2px 6px",
-                borderRadius: 4,
-                background: "rgba(244, 63, 94, 0.15)",
-                color: "#f43f5e",
-                border: "1px solid rgba(244, 63, 94, 0.3)",
-                letterSpacing: "0.06em",
-                fontFamily: "'JetBrains Mono', monospace",
-              }}
-            >
-              ADMIN
-            </span>
-          )}
-        </Link>
-
-        {/* Dynamic Nav Links Strictly Segregated By Role */}
-        <div style={{ display: "flex", gap: 4 }}>
-          {isAdmin ? (
-            <>
-              <Link href="/dashboard" style={getNavLinkStyle(activePage === "dashboard")}>
-                Dashboard
-              </Link>
-              <Link href="/practice" style={getNavLinkStyle(activePage === "practice")}>
-                Solo Practice
-              </Link>
-              <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
-                Leaderboard
-              </Link>
-              <Link href="/campus" style={getNavLinkStyle(activePage === "campus")}>
-                Campus Hub
-              </Link>
-              <Link
-                href="/admin/metrics"
-                style={{
-                  ...getNavLinkStyle(activePage === "admin"),
-                  color: "#f43f5e",
-                  fontWeight: 700,
-                }}
-              >
-                ⚡ Metrics
-              </Link>
-              <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
-                Pricing
-              </Link>
-              <Link href="/friends" style={getNavLinkStyle(activePage === "friends")}>
-                Friends
-              </Link>
-              <Link href="/profile" style={getNavLinkStyle(activePage === "profile")}>
-                Profile
-              </Link>
-            </>
-          ) : isFaculty ? (
-            <>
-              <Link href="/campus" style={getNavLinkStyle(activePage === "campus")}>
-                Faculty Hub
-              </Link>
-              <Link href="/practice" style={getNavLinkStyle(activePage === "practice")}>
-                Problem Sandbox
-              </Link>
-              <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
-                Leaderboard
-              </Link>
-              <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
-                Pricing
-              </Link>
-              <Link href="/profile" style={getNavLinkStyle(activePage === "profile")}>
-                Profile
-              </Link>
-            </>
-          ) : isStudent ? (
-            <>
-              <Link href="/dashboard" style={getNavLinkStyle(activePage === "dashboard")}>
-                Dashboard
-              </Link>
-              <Link href="/campus" style={getNavLinkStyle(activePage === "campus")}>
-                Campus Labs
-              </Link>
-              <Link href="/practice" style={getNavLinkStyle(activePage === "practice")}>
-                Solo Practice
-              </Link>
-              <Link href="/dashboard?action=find_match" style={getNavLinkStyle(false)}>
-                1v1 Duel
-              </Link>
-              <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
-                Leaderboard
-              </Link>
-              <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
-                Pricing
-              </Link>
-              <Link href="/friends" style={getNavLinkStyle(activePage === "friends")}>
-                Friends
-              </Link>
-              <Link href="/profile" style={getNavLinkStyle(activePage === "profile")}>
-                Profile
-              </Link>
-            </>
-          ) : (
-            /* INDIVIDUAL DEVELOPER: CAMPUS IS STRICTLY HIDDEN */
-            <>
-              <Link href="/dashboard" style={getNavLinkStyle(activePage === "dashboard")}>
-                Dashboard
-              </Link>
-              <Link href="/practice" style={getNavLinkStyle(activePage === "practice")}>
-                Solo Practice
-              </Link>
-              <Link href="/dashboard?action=find_match" style={getNavLinkStyle(false)}>
-                1v1 Arena
-              </Link>
-              <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
-                Leaderboard
-              </Link>
-              <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
-                Pricing
-              </Link>
-              <Link href="/friends" style={getNavLinkStyle(activePage === "friends")}>
-                Friends
-              </Link>
-              <Link href="/profile" style={getNavLinkStyle(activePage === "profile")}>
-                Profile
-              </Link>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Right Controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {customRightContent}
-
-        <RoleBadgeSwitcher initialRole={role} onRoleChanged={setRole} />
-
-
-        {isFaculty ? (
+    <>
+      <nav
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          height: 54,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 20px",
+          background: "rgba(6, 7, 12, 0.85)",
+          backdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.07)",
+          fontFamily: "system-ui, -apple-system, sans-serif",
+        }}
+      >
+        {/* Brand & Left Navigation */}
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <Link
-            href="/campus"
+            href={status === "authenticated" ? "/dashboard" : "/"}
             style={{
-              fontSize: 12,
-              fontWeight: 700,
-              background: "#38bdf8",
-              color: "#08090c",
-              padding: "7px 14px",
-              borderRadius: 7,
+              fontSize: 15,
+              fontWeight: 800,
+              color: "#fff",
               textDecoration: "none",
-              display: "inline-flex",
+              letterSpacing: "-0.02em",
+              display: "flex",
               alignItems: "center",
-              gap: 5,
-              transition: "transform 0.1s ease",
+              gap: 8,
             }}
           >
-            🏛️ Manage Cohorts
+            <span>Codeduel</span>
+            {isAdmin && (
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 800,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  background: "rgba(244, 63, 94, 0.15)",
+                  color: "#f43f5e",
+                  border: "1px solid rgba(244, 63, 94, 0.3)",
+                  letterSpacing: "0.06em",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+              >
+                ADMIN
+              </span>
+            )}
           </Link>
-        ) : isAdmin ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+
+          {/* Dynamic Nav Links Strictly Segregated By Role (Desktop Only) */}
+          <div className="nav-desktop-links" style={{ display: "flex", gap: 4 }}>
+            {isAdmin ? (
+              <>
+                <Link href="/dashboard" style={getNavLinkStyle(activePage === "dashboard")}>
+                  Dashboard
+                </Link>
+                <Link href="/practice" style={getNavLinkStyle(activePage === "practice")}>
+                  Solo Practice
+                </Link>
+                <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
+                  Leaderboard
+                </Link>
+                <Link href="/campus" style={getNavLinkStyle(activePage === "campus")}>
+                  Campus Hub
+                </Link>
+                <Link
+                  href="/admin/metrics"
+                  style={{
+                    ...getNavLinkStyle(activePage === "admin"),
+                    color: "#f43f5e",
+                    fontWeight: 700,
+                  }}
+                >
+                  ⚡ Metrics
+                </Link>
+                <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
+                  Pricing
+                </Link>
+                <Link href="/friends" style={getNavLinkStyle(activePage === "friends")}>
+                  Friends
+                </Link>
+                <Link href="/profile" style={getNavLinkStyle(activePage === "profile")}>
+                  Profile
+                </Link>
+              </>
+            ) : isFaculty ? (
+              <>
+                <Link href="/campus" style={getNavLinkStyle(activePage === "campus")}>
+                  Faculty Hub
+                </Link>
+                <Link href="/practice" style={getNavLinkStyle(activePage === "practice")}>
+                  Problem Sandbox
+                </Link>
+                <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
+                  Leaderboard
+                </Link>
+                <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
+                  Pricing
+                </Link>
+                <Link href="/profile" style={getNavLinkStyle(activePage === "profile")}>
+                  Profile
+                </Link>
+              </>
+            ) : isStudent ? (
+              <>
+                <Link href="/dashboard" style={getNavLinkStyle(activePage === "dashboard")}>
+                  Dashboard
+                </Link>
+                <Link href="/campus" style={getNavLinkStyle(activePage === "campus")}>
+                  Campus Labs
+                </Link>
+                <Link href="/practice" style={getNavLinkStyle(activePage === "practice")}>
+                  Solo Practice
+                </Link>
+                <Link href="/dashboard?action=find_match" style={getNavLinkStyle(false)}>
+                  1v1 Duel
+                </Link>
+                <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
+                  Leaderboard
+                </Link>
+                <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
+                  Pricing
+                </Link>
+                <Link href="/friends" style={getNavLinkStyle(activePage === "friends")}>
+                  Friends
+                </Link>
+                <Link href="/profile" style={getNavLinkStyle(activePage === "profile")}>
+                  Profile
+                </Link>
+              </>
+            ) : (
+              /* INDIVIDUAL DEVELOPER: CAMPUS IS STRICTLY HIDDEN */
+              <>
+                <Link href="/dashboard" style={getNavLinkStyle(activePage === "dashboard")}>
+                  Dashboard
+                </Link>
+                <Link href="/practice" style={getNavLinkStyle(activePage === "practice")}>
+                  Solo Practice
+                </Link>
+                <Link href="/dashboard?action=find_match" style={getNavLinkStyle(false)}>
+                  1v1 Arena
+                </Link>
+                <Link href="/leaderboard" style={getNavLinkStyle(activePage === "leaderboard")}>
+                  Leaderboard
+                </Link>
+                <Link href="/pricing" style={getNavLinkStyle(activePage === "pricing")}>
+                  Pricing
+                </Link>
+                <Link href="/friends" style={getNavLinkStyle(activePage === "friends")}>
+                  Friends
+                </Link>
+                <Link href="/profile" style={getNavLinkStyle(activePage === "profile")}>
+                  Profile
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Right Controls */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {customRightContent}
+
+          <div className="nav-desktop-links">
+            <RoleBadgeSwitcher initialRole={role} onRoleChanged={setRole} />
+          </div>
+
+          {isFaculty ? (
             <Link
-              href="/admin/metrics"
+              href="/campus"
+              className="nav-desktop-links"
               style={{
                 fontSize: 12,
                 fontWeight: 700,
-                background: "linear-gradient(135deg, #f43f5e, #e11d48)",
-                color: "#fff",
-                padding: "7px 12px",
+                background: "#38bdf8",
+                color: "#08090c",
+                padding: "7px 14px",
                 borderRadius: 7,
                 textDecoration: "none",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 5,
-                boxShadow: "0 0 10px rgba(244,63,94,0.3)",
+                transition: "transform 0.1s ease",
               }}
             >
-              ⚡ Admin Metrics
+              🏛️ Manage Cohorts
             </Link>
-            {matchState === "queued" ? (
-              <button
-                onClick={onCancelMatch}
+          ) : isAdmin ? (
+            <div className="nav-desktop-links" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Link
+                href="/admin/metrics"
                 style={{
-                  background: "rgba(248,113,113,0.15)",
-                  border: "1px solid rgba(248,113,113,0.4)",
-                  color: "#f87171",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  padding: "7px 12px",
-                  borderRadius: 7,
-                  cursor: "pointer",
-                }}
-              >
-                Cancel search
-              </button>
-            ) : (
-              <button
-                onClick={handleMatchClick}
-                style={{
-                  background: "#fff",
-                  color: "#000",
                   fontSize: 12,
                   fontWeight: 700,
-                  padding: "7px 14px",
+                  background: "linear-gradient(135deg, #f43f5e, #e11d48)",
+                  color: "#fff",
+                  padding: "7px 12px",
                   borderRadius: 7,
-                  border: "none",
-                  cursor: "pointer",
+                  textDecoration: "none",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 5,
+                  boxShadow: "0 0 10px rgba(244,63,94,0.3)",
                 }}
               >
-                <span>⚔️</span> Find Match
-              </button>
-            )}
-          </div>
-        ) : matchState === "queued" ? (
-          <button
-            onClick={onCancelMatch}
-            style={{
-              background: "rgba(248,113,113,0.15)",
-              border: "1px solid rgba(248,113,113,0.4)",
-              color: "#f87171",
-              fontSize: 12,
-              fontWeight: 600,
-              padding: "7px 14px",
-              borderRadius: 7,
-              cursor: "pointer",
-            }}
-          >
-            Cancel search
-          </button>
-        ) : (
-          <button
-            onClick={handleMatchClick}
-            style={{
-              background: "#fff",
-              color: "#000",
-              fontSize: 12,
-              fontWeight: 700,
-              padding: "7px 14px",
-              borderRadius: 7,
-              border: "none",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-            </svg>
-            Find Match
-          </button>
-        )}
-
-        {/* User Profile Avatar & Dropdown */}
-        {status === "authenticated" ? (
-          <div style={{ position: "relative" }}>
-            <div
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                background: "rgba(139,142,255,0.12)",
-                border: "1px solid rgba(139,142,255,0.25)",
-                overflow: "hidden",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#8b8eff",
-                fontFamily: "'JetBrains Mono', monospace",
-              }}
-            >
-              {session?.user?.image ? (
-                <img src={session.user.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                (session?.user?.name?.[0] ?? "?").toUpperCase()
-              )}
-            </div>
-
-            {showProfileMenu && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  right: 0,
-                  marginTop: 8,
-                  background: "#0d0e15",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 8,
-                  overflow: "hidden",
-                  zIndex: 60,
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.7)",
-                  minWidth: 180,
-                }}
-              >
-                <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {session?.user?.name || "Developer"}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#8a8898" }}>
-                    {role === "ADMIN" ? "Platform Admin" : role === "FACULTY" ? "Faculty" : role === "STUDENT" ? "Student" : "Individual"}
-                  </div>
-                </div>
-
-                <Link
-                  href="/profile"
+                ⚡ Admin Metrics
+              </Link>
+              {matchState === "queued" ? (
+                <button
+                  onClick={onCancelMatch}
                   style={{
-                    padding: "9px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
+                    background: "rgba(248,113,113,0.15)",
+                    border: "1px solid rgba(248,113,113,0.4)",
+                    color: "#f87171",
                     fontSize: 12,
                     fontWeight: 600,
-                    color: "#e8e6f0",
-                    textDecoration: "none",
-                    borderBottom: "1px solid rgba(255,255,255,0.04)",
+                    padding: "7px 12px",
+                    borderRadius: 7,
+                    cursor: "pointer",
                   }}
                 >
-                  👤 My Profile
-                </Link>
-
-                <Link
-                  href="/pricing"
+                  Cancel search
+                </button>
+              ) : (
+                <button
+                  onClick={handleMatchClick}
                   style={{
-                    padding: "9px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
+                    background: "#fff",
+                    color: "#000",
                     fontSize: 12,
                     fontWeight: 700,
-                    color: "#8b8eff",
-                    textDecoration: "none",
-                    borderBottom: "1px solid rgba(255,255,255,0.04)",
-                    background: "rgba(139,142,255,0.06)",
+                    padding: "7px 14px",
+                    borderRadius: 7,
+                    border: "none",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
                   }}
                 >
-                  ⚡ Upgrade to Pro / Pricing
-                </Link>
+                  <span>⚔️</span> Find Match
+                </button>
+              )}
+            </div>
+          ) : matchState === "queued" ? (
+            <button
+              onClick={onCancelMatch}
+              className="nav-desktop-links"
+              style={{
+                background: "rgba(248,113,113,0.15)",
+                border: "1px solid rgba(248,113,113,0.4)",
+                color: "#f87171",
+                fontSize: 12,
+                fontWeight: 600,
+                padding: "7px 14px",
+                borderRadius: 7,
+                cursor: "pointer",
+              }}
+            >
+              Cancel search
+            </button>
+          ) : (
+            <button
+              onClick={handleMatchClick}
+              className="nav-desktop-links"
+              style={{
+                background: "#fff",
+                color: "#000",
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "7px 14px",
+                borderRadius: 7,
+                border: "none",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+              Find Match
+            </button>
+          )}
 
-                {isAdmin && (
+          {/* User Profile Avatar & Dropdown */}
+          {status === "authenticated" ? (
+            <div style={{ position: "relative" }}>
+              <div
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: "rgba(139,142,255,0.12)",
+                  border: "1px solid rgba(139,142,255,0.25)",
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#8b8eff",
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}
+              >
+                {session?.user?.image ? (
+                  <img src={session.user.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  (session?.user?.name?.[0] ?? "?").toUpperCase()
+                )}
+              </div>
+
+              {showProfileMenu && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    marginTop: 8,
+                    background: "#0d0e15",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    zIndex: 60,
+                    boxShadow: "0 10px 30px rgba(0,0,0,0.7)",
+                    minWidth: 180,
+                  }}
+                >
+                  <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {session?.user?.name || "Developer"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#8a8898" }}>
+                      {role === "ADMIN" ? "Platform Admin" : role === "FACULTY" ? "Faculty" : role === "STUDENT" ? "Student" : "Individual"}
+                    </div>
+                  </div>
+
                   <Link
-                    href="/admin/metrics"
+                    href="/profile"
+                    onClick={() => setShowProfileMenu(false)}
+                    style={{
+                      padding: "9px 14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#e8e6f0",
+                      textDecoration: "none",
+                      borderBottom: "1px solid rgba(255,255,255,0.04)",
+                    }}
+                  >
+                    👤 My Profile
+                  </Link>
+
+                  <Link
+                    href="/pricing"
+                    onClick={() => setShowProfileMenu(false)}
                     style={{
                       padding: "9px 14px",
                       display: "flex",
@@ -419,71 +409,317 @@ export default function AppNavbar({
                       gap: 8,
                       fontSize: 12,
                       fontWeight: 700,
-                      color: "#f43f5e",
+                      color: "#8b8eff",
                       textDecoration: "none",
                       borderBottom: "1px solid rgba(255,255,255,0.04)",
-                      background: "rgba(244,63,94,0.06)",
+                      background: "rgba(139,142,255,0.06)",
                     }}
                   >
-                    ⚡ Platform Metrics
+                    ⚡ Upgrade to Pro / Pricing
                   </Link>
-                )}
 
-                <button
-                  onClick={() => signOut({ callbackUrl: "/" })}
-                  style={{
-                    background: "rgba(248,113,113,0.08)",
-                    border: "none",
-                    color: "#f87171",
-                    padding: "9px 14px",
-                    cursor: "pointer",
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    fontFamily: "inherit",
-                    textAlign: "left",
-                  }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                    <polyline points="16 17 21 12 16 7"></polyline>
-                    <line x1="21" y1="12" x2="9" y2="12"></line>
-                  </svg>
-                  Sign Out
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
+                  {isAdmin && (
+                    <Link
+                      href="/admin/metrics"
+                      onClick={() => setShowProfileMenu(false)}
+                      style={{
+                        padding: "9px 14px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#f43f5e",
+                        textDecoration: "none",
+                        borderBottom: "1px solid rgba(255,255,255,0.04)",
+                        background: "rgba(244,63,94,0.06)",
+                      }}
+                    >
+                      ⚡ Platform Metrics
+                    </Link>
+                  )}
+
+                  <button
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                    style={{
+                      background: "rgba(248,113,113,0.08)",
+                      border: "none",
+                      color: "#f87171",
+                      padding: "9px 14px",
+                      cursor: "pointer",
+                      width: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      fontFamily: "inherit",
+                      textAlign: "left",
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                      <polyline points="16 17 21 12 16 7"></polyline>
+                      <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => signIn("github")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.16)",
+                color: "#fff",
+                padding: "6px 14px",
+                borderRadius: 7,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+              </svg>
+              Sign In
+            </button>
+          )}
+
+          {/* Mobile Hamburger Toggle Button */}
           <button
-            onClick={() => signIn("github")}
+            className="nav-mobile-toggle"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation menu"
+            aria-expanded={mobileMenuOpen}
             style={{
-              display: "inline-flex",
+              display: "none",
               alignItems: "center",
-              gap: 6,
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.16)",
+              justifyContent: "center",
+              width: 34,
+              height: 34,
+              borderRadius: 6,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
               color: "#fff",
-              padding: "6px 14px",
-              borderRadius: 7,
-              fontSize: 12,
-              fontWeight: 600,
               cursor: "pointer",
-              transition: "all 0.15s ease",
+              padding: 0,
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-            </svg>
-            Sign In
+            {mobileMenuOpen ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            )}
           </button>
-        )}
-      </div>
-    </nav>
+        </div>
+      </nav>
+
+      {/* Mobile Slide-Down Navigation Drawer */}
+      {mobileMenuOpen && (
+        <div
+          className="nav-mobile-drawer"
+          style={{
+            position: "fixed",
+            top: 54,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(6, 7, 12, 0.96)",
+            backdropFilter: "blur(24px)",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
+            padding: "16px 20px 32px",
+            zIndex: 49,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            boxShadow: "0 20px 40px rgba(0,0,0,0.8)",
+            overflowY: "auto",
+          }}
+        >
+          {/* Mobile Role Switcher & Persona Indicator */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 12, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <span style={{ fontSize: 11, color: "#8a8898", textTransform: "uppercase", letterSpacing: 1 }}>Active Persona</span>
+            <RoleBadgeSwitcher initialRole={role} onRoleChanged={(r) => { setRole(r); setMobileMenuOpen(false); }} />
+          </div>
+
+          {/* Quick Action Button */}
+          {isFaculty ? (
+            <Link
+              href="/campus"
+              onClick={() => setMobileMenuOpen(false)}
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                background: "#38bdf8",
+                color: "#08090c",
+                padding: "11px 16px",
+                borderRadius: 8,
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              🏛️ Manage Cohorts
+            </Link>
+          ) : (
+            <button
+              onClick={handleMatchClick}
+              style={{
+                background: "#fff",
+                color: "#000",
+                fontSize: 13,
+                fontWeight: 700,
+                padding: "11px 16px",
+                borderRadius: 8,
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              <span>⚔️</span>
+              <span>Find Match</span>
+            </button>
+          )}
+
+          {/* Navigation Links */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+            {isAdmin ? (
+              <>
+                <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "dashboard")}>
+                  📊 Dashboard
+                </Link>
+                <Link href="/practice" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "practice")}>
+                  🎯 Solo Practice
+                </Link>
+                <Link href="/leaderboard" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "leaderboard")}>
+                  🏆 Leaderboard
+                </Link>
+                <Link href="/campus" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "campus")}>
+                  🏫 Campus Hub
+                </Link>
+                <Link href="/admin/metrics" onClick={() => setMobileMenuOpen(false)} style={{ ...getMobileNavLinkStyle(activePage === "admin"), color: "#f43f5e" }}>
+                  ⚡ Platform Metrics
+                </Link>
+                <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "pricing")}>
+                  💳 Pricing
+                </Link>
+                <Link href="/friends" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "friends")}>
+                  👥 Friends
+                </Link>
+                <Link href="/profile" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "profile")}>
+                  👤 Profile
+                </Link>
+              </>
+            ) : isFaculty ? (
+              <>
+                <Link href="/campus" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "campus")}>
+                  🏛️ Faculty Hub
+                </Link>
+                <Link href="/practice" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "practice")}>
+                  🎯 Problem Sandbox
+                </Link>
+                <Link href="/leaderboard" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "leaderboard")}>
+                  🏆 Leaderboard
+                </Link>
+                <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "pricing")}>
+                  💳 Pricing
+                </Link>
+                <Link href="/profile" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "profile")}>
+                  👤 Profile
+                </Link>
+              </>
+            ) : isStudent ? (
+              <>
+                <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "dashboard")}>
+                  📊 Dashboard
+                </Link>
+                <Link href="/campus" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "campus")}>
+                  🏫 Campus Labs
+                </Link>
+                <Link href="/practice" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "practice")}>
+                  🎯 Solo Practice
+                </Link>
+                <Link href="/dashboard?action=find_match" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(false)}>
+                  ⚔️ 1v1 Duel
+                </Link>
+                <Link href="/leaderboard" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "leaderboard")}>
+                  🏆 Leaderboard
+                </Link>
+                <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "pricing")}>
+                  💳 Pricing
+                </Link>
+                <Link href="/friends" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "friends")}>
+                  👥 Friends
+                </Link>
+                <Link href="/profile" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "profile")}>
+                  👤 Profile
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "dashboard")}>
+                  📊 Dashboard
+                </Link>
+                <Link href="/practice" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "practice")}>
+                  🎯 Solo Practice
+                </Link>
+                <Link href="/dashboard?action=find_match" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(false)}>
+                  ⚔️ 1v1 Arena
+                </Link>
+                <Link href="/leaderboard" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "leaderboard")}>
+                  🏆 Leaderboard
+                </Link>
+                <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "pricing")}>
+                  💳 Pricing
+                </Link>
+                <Link href="/friends" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "friends")}>
+                  👥 Friends
+                </Link>
+                <Link href="/profile" onClick={() => setMobileMenuOpen(false)} style={getMobileNavLinkStyle(activePage === "profile")}>
+                  👤 Profile
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
+}
+
+function getMobileNavLinkStyle(isActive: boolean): React.CSSProperties {
+  return {
+    fontSize: 14,
+    fontWeight: isActive ? 700 : 500,
+    color: isActive ? "#fff" : "#8a8898",
+    background: isActive ? "rgba(139,142,255,0.12)" : "rgba(255,255,255,0.02)",
+    border: `1px solid ${isActive ? "rgba(139,142,255,0.3)" : "rgba(255,255,255,0.04)"}`,
+    padding: "12px 14px",
+    borderRadius: 8,
+    textDecoration: "none",
+    display: "flex",
+    alignItems: "center",
+    minHeight: 44,
+  };
 }
 
 function getNavLinkStyle(isActive: boolean): React.CSSProperties {

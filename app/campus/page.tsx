@@ -600,7 +600,7 @@ export default function CampusPage() {
               You are currently viewing Codeduel with an <strong>Individual Developer</strong> profile. Campus Edition is an institutional environment dedicated to university course cohorts, student lab autograding, and verified faculty grading.
             </p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, textAlign: "left", marginBottom: 32 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 18, textAlign: "left", marginBottom: 32 }}>
               {/* Option 1: College Student */}
               <div
                 style={{
@@ -1457,7 +1457,7 @@ export default function CampusPage() {
             </div>
 
             {/* ── 2-COLUMN MAIN LAYOUT ───────────────────────────────────── */}
-            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 24, alignItems: "start" }}>
+            <div className="campus-main-grid" style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 24, alignItems: "start" }}>
               {/* ── LEFT: LAB ASSIGNMENTS ───────────────────────────────── */}
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>

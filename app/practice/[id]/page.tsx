@@ -90,6 +90,7 @@ export default function SoloPracticeArena() {
   const [submitResult, setSubmitResult] = useState<SubmitResult | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<"testResults" | "logs">("testResults");
   const [leftTab, setLeftTab] = useState<"ticket" | "checklist" | "hardware">("ticket");
+  const [mobileArenaTab, setMobileArenaTab] = useState<"brief" | "code">("code");
   const [triageChecklist, setTriageChecklist] = useState<Record<string, boolean>>({
     symptomIdentified: false,
     moduleIsolated: false,
@@ -643,10 +644,68 @@ export default function SoloPracticeArena() {
         </div>
       )}
 
+      {/* Mobile Tab Switcher (Visible on <= 900px viewports) */}
+      <div
+        className="arena-mobile-tabs"
+        style={{
+          height: 42,
+          background: "#0a0b12",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          padding: "4px 8px",
+          gap: 6,
+          alignItems: "center",
+          flexShrink: 0,
+        }}
+      >
+        <button
+          onClick={() => setMobileArenaTab("brief")}
+          style={{
+            flex: 1,
+            height: 32,
+            borderRadius: 6,
+            background: mobileArenaTab === "brief" ? "#8b8eff" : "rgba(255,255,255,0.04)",
+            color: mobileArenaTab === "brief" ? "#000" : "#8a8898",
+            border: "none",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+          }}
+        >
+          <span>📋</span>
+          <span>Diagnosis &amp; Hardware</span>
+        </button>
+        <button
+          onClick={() => setMobileArenaTab("code")}
+          style={{
+            flex: 1,
+            height: 32,
+            borderRadius: 6,
+            background: mobileArenaTab === "code" ? "#8b8eff" : "rgba(255,255,255,0.04)",
+            color: mobileArenaTab === "code" ? "#000" : "#8a8898",
+            border: "none",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+          }}
+        >
+          <span>💻</span>
+          <span>Code Editor &amp; Tests</span>
+        </button>
+      </div>
+
       {/* ── WORKSPACE SPLIT (Left: Ticket / Right: Editor) ────────────────── */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div className="arena-workspace-split" style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* LEFT PANEL: Production Ticket Brief */}
         <div
+          className={`arena-workspace-left ${mobileArenaTab !== "brief" ? "hidden-on-mobile" : ""}`}
           style={{
             width: "38%",
             borderRight: "1px solid rgba(255,255,255,0.08)",
@@ -871,6 +930,7 @@ export default function SoloPracticeArena() {
 
         {/* RIGHT PANEL: Multi-File Monaco Editor Workspace */}
         <div
+          className={`arena-workspace-right ${mobileArenaTab !== "code" ? "hidden-on-mobile" : ""}`}
           style={{
             width: "62%",
             display: "flex",

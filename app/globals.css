@@ -56,3 +56,105 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── RESPONSIVE FOUNDATION & UTILITIES ────────────────────────────────────── */
+
+img, svg, video, canvas, audio, iframe, embed, object {
+  max-width: 100%;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 1024px) {
+  .nav-desktop-links {
+    display: none !important;
+  }
+  .nav-mobile-toggle {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 1025px) {
+  .nav-mobile-toggle {
+    display: none !important;
+  }
+  .nav-mobile-drawer {
+    display: none !important;
+  }
+}
+
+/* Arena Responsive Workspace (Practice & Match) */
+.arena-mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .arena-mobile-tabs {
+    display: flex !important;
+  }
+  .hidden-on-mobile {
+    display: none !important;
+  }
+  .arena-workspace-split {
+    flex-direction: column !important;
+  }
+  .arena-workspace-left {
+    width: 100% !important;
+    height: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .arena-workspace-right {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+/* General Layout Responsive Adapters */
+@media (max-width: 768px) {
+  .campus-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .profile-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .profile-stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+  .profile-stats-grid > div {
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .hide-on-xs {
+    display: none !important;
+  }
+  .db-main {
+    padding: 20px 14px 60px !important;
+  }
+  .practice-main {
+    padding: 20px 14px 60px !important;
+  }
+  .lb-main {
+    padding: 24px 14px 60px !important;
+  }
+  .pricing-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (pointer: coarse) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

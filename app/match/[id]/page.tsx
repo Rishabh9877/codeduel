@@ -119,6 +119,7 @@ export default function MatchArena() {
   const [submitResult, setSubmitResult] = useState<(SubmitResult & { runtimeMs?: number; walkthrough?: ChallengeWalkthrough; canonicalSolution?: string }) | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<"testResults" | "logs">("testResults");
   const [leftTab, setLeftTab] = useState<"ticket" | "checklist" | "hardware">("ticket");
+  const [mobileArenaTab, setMobileArenaTab] = useState<"brief" | "code">("code");
 
   // Post-Mortem Diff & Checklist
   const [showDiffDrawer, setShowDiffDrawer] = useState(false);
@@ -992,17 +993,77 @@ export default function MatchArena() {
         </div>
       </div>
 
+      {/* Mobile Tab Switcher (Visible on <= 900px viewports) */}
+      <div
+        className="arena-mobile-tabs"
+        style={{
+          height: 42,
+          background: "#0a0b12",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          padding: "4px 8px",
+          gap: 6,
+          alignItems: "center",
+          flexShrink: 0,
+        }}
+      >
+        <button
+          onClick={() => setMobileArenaTab("brief")}
+          style={{
+            flex: 1,
+            height: 32,
+            borderRadius: 6,
+            background: mobileArenaTab === "brief" ? "#8b8eff" : "rgba(255,255,255,0.04)",
+            color: mobileArenaTab === "brief" ? "#000" : "#8a8898",
+            border: "none",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+          }}
+        >
+          <span>📋</span>
+          <span>Diagnosis &amp; Hardware</span>
+        </button>
+        <button
+          onClick={() => setMobileArenaTab("code")}
+          style={{
+            flex: 1,
+            height: 32,
+            borderRadius: 6,
+            background: mobileArenaTab === "code" ? "#8b8eff" : "rgba(255,255,255,0.04)",
+            color: mobileArenaTab === "code" ? "#000" : "#8a8898",
+            border: "none",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+          }}
+        >
+          <span>💻</span>
+          <span>Code Editor &amp; Tests</span>
+        </button>
+      </div>
+
       {/* ── WORKSPACE SPLIT (Left: Ticket / Right: Multi-File Monaco) ──────── */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div className="arena-workspace-split" style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {/* LEFT PANEL: Production Ticket Inspector */}
-        <div style={{
-          width: "38%",
-          borderRight: "1px solid rgba(255,255,255,0.08)",
-          background: "#0a0a10",
-          display: "flex",
-          flexDirection: "column",
-          overflowY: "auto"
-        }}>
+        <div
+          className={`arena-workspace-left ${mobileArenaTab !== "brief" ? "hidden-on-mobile" : ""}`}
+          style={{
+            width: "38%",
+            borderRight: "1px solid rgba(255,255,255,0.08)",
+            background: "#0a0a10",
+            display: "flex",
+            flexDirection: "column",
+            overflowY: "auto"
+          }}
+        >
           {/* Header */}
           <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
             <h1 style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
@@ -1217,13 +1278,16 @@ export default function MatchArena() {
         </div>
 
         {/* RIGHT PANEL: Multi-File Monaco Editor Workspace */}
-        <div style={{
-          width: "62%",
-          display: "flex",
-          flexDirection: "column",
-          background: "#0c0d14",
-          overflow: "hidden"
-        }}>
+        <div
+          className={`arena-workspace-right ${mobileArenaTab !== "code" ? "hidden-on-mobile" : ""}`}
+          style={{
+            width: "62%",
+            display: "flex",
+            flexDirection: "column",
+            background: "#0c0d14",
+            overflow: "hidden"
+          }}
+        >
           {/* MONACO TABS BAR */}
           <div style={{
             height: 40,

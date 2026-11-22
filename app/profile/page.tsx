@@ -319,7 +319,7 @@ export default function ProfilePage() {
           </div>
 
           {/* STATS ROW */}
-          <div style={{ ...S.card, marginTop: 16, display: "flex", alignItems: "center" }}>
+          <div className="profile-stats-grid" style={{ ...S.card, marginTop: 16, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             {[
               { label: "ELO",          value: profile.elo.toString() },
               { label: "Peak ELO",     value: profile.peakElo.toString() },
@@ -329,8 +329,8 @@ export default function ProfilePage() {
               { label: "Wins",         value: profile.wins.toString() },
               { label: "Losses",       value: profile.losses.toString() },
             ].map((s, i) => (
-              <div key={s.label} style={{ flex: 1, display: "flex", alignItems: "center" }}>
-                {i > 0 && <div style={{ width: 1, height: 40, background: "#2a2c30", marginRight: 20 }} />}
+              <div key={s.label} style={{ flex: 1, minWidth: 90, display: "flex", alignItems: "center" }}>
+                {i > 0 && <div className="hide-on-xs" style={{ width: 1, height: 40, background: "#2a2c30", marginRight: 16 }} />}
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: "#f5f3ec" }}>{s.value}</div>
                   <div style={{ fontSize: 10, color: "#8a8c82", textTransform: "uppercase", letterSpacing: 0.8, marginTop: 2 }}>{s.label}</div>
@@ -340,7 +340,7 @@ export default function ProfilePage() {
           </div>
 
           {/* MAIN 2-COL GRID */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 20, marginTop: 20, alignItems: "start" }}>
+          <div className="profile-main-grid" style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 20, marginTop: 20, alignItems: "start" }}>
 
             {/* LEFT COL */}
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -403,7 +403,7 @@ export default function ProfilePage() {
                   <span style={S.sectionTtl}>Trophy Cabinet</span>
                   <span style={S.muted}>{earnedTrophies.length}/{trophies.length} earned</span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 130px), 1fr))", gap: 10 }}>
                   {trophies.map(t => (
                     <div key={t.id} className="trophy-card" style={{ background: t.earned ? "rgba(139,142,255,0.06)" : "rgba(255,255,255,0.02)", border: `1px solid ${t.earned ? "rgba(139,142,255,0.2)" : "#1e2025"}`, borderRadius: 10, padding: "14px 10px", textAlign: "center", opacity: t.earned ? 1 : 0.4, transition: "all 0.2s", cursor: "default" }}>
                       <div style={{ fontSize: 24, marginBottom: 6 }}>{t.icon}</div>

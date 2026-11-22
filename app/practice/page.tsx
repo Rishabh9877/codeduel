@@ -276,7 +276,9 @@ export default function PracticeCatalogPage() {
           color: var(--text);
           font-size: 13px;
           outline: none;
-          min-width: 240px;
+          min-width: 0;
+          width: 100%;
+          max-width: 320px;
           transition: border-color 0.15s;
         }
 
@@ -287,7 +289,7 @@ export default function PracticeCatalogPage() {
         /* CHALLENGE GRID */
         .challenge-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
           gap: 20px;
         }
 

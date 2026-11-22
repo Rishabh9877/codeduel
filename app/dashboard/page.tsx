@@ -1522,66 +1522,68 @@ export default function Dashboard() {
               View All →
             </Link>
           </div>
-          <table className="match-table">
-            <thead>
-              <tr>
-                <th>Opponent</th>
-                <th>Problem</th>
-                <th>Result</th>
-                <th>ELO Change</th>
-                <th>Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!isLoaded ? (
-                [1,2,3,4,5].map(i => (
-                  <tr key={i}>
-                    <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
-                    <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
-                    <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
-                    <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
-                    <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
-                  </tr>
-                ))
-              ) : recentMatches.length === 0 ? (
+          <div className="table-responsive">
+            <table className="match-table">
+              <thead>
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", color: "var(--muted2)", padding: "20px" }}>
-                    No matches played yet.
-                  </td>
+                  <th>Opponent</th>
+                  <th>Problem</th>
+                  <th>Result</th>
+                  <th>ELO Change</th>
+                  <th>Time</th>
                 </tr>
-              ) : (
-                recentMatches.map((m, i) => (
-                  <tr key={i}>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span>
-                          <span className="vs-text">vs.</span>
-                        </span>
-                        {m.opponentAvatar ? (
-                          <img src={m.opponentAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--border)" }} />
-                        ) : (
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, border: "1px solid var(--border)", color: "var(--muted2)" }}>
-                            {m.opponent?.[0]?.toUpperCase() ?? "?"}
-                          </div>
-                        )}
-                        <span>
-                          <span className="opp-name">{m.opponent}</span>
-                        </span>
-                      </div>
+              </thead>
+              <tbody>
+                {!isLoaded ? (
+                  [1,2,3,4,5].map(i => (
+                    <tr key={i}>
+                      <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
+                      <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
+                      <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
+                      <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
+                      <td><div className="skeleton" style={{ width: "100%", height: 16 }}></div></td>
+                    </tr>
+                  ))
+                ) : recentMatches.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: "center", color: "var(--muted2)", padding: "20px" }}>
+                      No matches played yet.
                     </td>
-                    <td style={{ color: "var(--muted2)" }}>{m.problem}</td>
-                    <td>
-                      <span className={m.result === "Win" ? "result-win" : "result-loss"}>{m.result}</span>
-                    </td>
-                    <td>
-                      <span className={m.elo.startsWith("+") ? "elo-pos" : "elo-neg"}>{m.elo} ELO</span>
-                    </td>
-                    <td className="time-cell">{new Date(m.playedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  recentMatches.map((m, i) => (
+                    <tr key={i}>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span>
+                            <span className="vs-text">vs.</span>
+                          </span>
+                          {m.opponentAvatar ? (
+                            <img src={m.opponentAvatar} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--border)" }} />
+                          ) : (
+                            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, border: "1px solid var(--border)", color: "var(--muted2)" }}>
+                              {m.opponent?.[0]?.toUpperCase() ?? "?"}
+                            </div>
+                          )}
+                          <span>
+                            <span className="opp-name">{m.opponent}</span>
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ color: "var(--muted2)" }}>{m.problem}</td>
+                      <td>
+                        <span className={m.result === "Win" ? "result-win" : "result-loss"}>{m.result}</span>
+                      </td>
+                      <td>
+                        <span className={m.elo.startsWith("+") ? "elo-pos" : "elo-neg"}>{m.elo} ELO</span>
+                      </td>
+                      <td className="time-cell">{new Date(m.playedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Production Engineering Challenges */}

@@ -13,6 +13,7 @@ export default function LandingPage() {
   const [previewTab, setPreviewTab] = useState<"embedded" | "swe">("embedded");
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<UserRole>("STUDENT");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const handleSignInWithRole = (role: UserRole) => {
     localStorage.setItem("preferred_role", role);
@@ -94,6 +95,25 @@ export default function LandingPage() {
         .nav-center a { font-size: 13px; color: var(--muted2); transition: color .15s; }
         .nav-center a:hover { color: var(--text); }
         .nav-right { display: flex; align-items: center; gap: 8px; }
+
+        .landing-mobile-toggle {
+          display: none;
+          align-items: center;
+          justify-content: center;
+          width: 34px;
+          height: 34px;
+          border-radius: 6px;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.12);
+          color: #fff;
+          cursor: pointer;
+          padding: 0;
+        }
+
+        @media (max-width: 768px) {
+          .nav-center { display: none; }
+          .landing-mobile-toggle { display: flex; }
+        }
 
         .btn-primary {
           font-size: 13px; font-weight: 600;
@@ -242,6 +262,7 @@ export default function LandingPage() {
         .test-badge-row {
           display: flex; align-items: center; justify-content: space-between;
           font-size: 11.5px; font-family: 'JetBrains Mono', monospace;
+          flex-wrap: wrap; gap: 6px;
         }
         .tb-pass { color: var(--green); }
         .tb-fail { color: var(--red); }
@@ -253,10 +274,15 @@ export default function LandingPage() {
           padding: 10px 20px;
           display: flex; align-items: center; justify-content: space-between;
           font-size: 12px; font-family: 'JetBrains Mono', monospace;
+          flex-wrap: wrap; gap: 8px;
         }
 
         /* ── SECTIONS COMMON ─────────────────────────────── */
         section { padding: 92px 24px; max-width: 1040px; margin: 0 auto; scroll-margin-top: 70px; }
+        @media (max-width: 640px) {
+          section { padding: 60px 16px; }
+          .hero { padding: 90px 16px 40px !important; }
+        }
         .eyebrow-sm {
           display: inline-block; font-size: 11px; font-family: 'JetBrains Mono', monospace;
           text-transform: uppercase; letter-spacing: 0.12em; color: var(--indigo);
@@ -277,7 +303,7 @@ export default function LandingPage() {
 
         /* ── THE PROBLEM ─────────────────────────────────── */
         .problem-grid {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
           gap: 20px;
         }
         .problem-card {
@@ -292,7 +318,7 @@ export default function LandingPage() {
 
         /* ── HOW IT WORKS ────────────────────────────────── */
         .steps-grid {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
           gap: 16px;
         }
         .step-card {
@@ -305,7 +331,7 @@ export default function LandingPage() {
 
         /* ── TWO TRACKS ──────────────────────────────────── */
         .tracks-grid {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
           gap: 24px;
         }
         .track-card {
@@ -341,7 +367,7 @@ export default function LandingPage() {
 
         /* ── PRICING TEASER ──────────────────────────────── */
         .pricing-grid {
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
           gap: 20px; margin-bottom: 28px;
         }
         .pricing-card {
@@ -438,10 +464,78 @@ export default function LandingPage() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
             </svg>
-            Sign In / Join Arena
+            <span className="hide-on-xs">Sign In / Join Arena</span>
+          </button>
+
+          {/* Landing Mobile Menu Toggle */}
+          <button
+            className="landing-mobile-toggle"
+            onClick={() => setMobileNavOpen(!mobileNavOpen)}
+            aria-label="Toggle navigation menu"
+            aria-expanded={mobileNavOpen}
+          >
+            {mobileNavOpen ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            )}
           </button>
         </div>
       </nav>
+
+      {/* Landing Mobile Menu Drawer */}
+      {mobileNavOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 52,
+            left: 0,
+            right: 0,
+            background: "rgba(6, 7, 12, 0.98)",
+            backdropFilter: "blur(24px)",
+            borderBottom: "1px solid var(--border2)",
+            padding: "20px 24px 28px",
+            zIndex: 99,
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+            boxShadow: "0 20px 40px rgba(0,0,0,0.8)",
+          }}
+        >
+          <Link href="#problem" onClick={() => setMobileNavOpen(false)} style={{ fontSize: 15, color: "var(--text)", padding: "8px 0" }}>
+            The Problem
+          </Link>
+          <Link href="#how-it-works" onClick={() => setMobileNavOpen(false)} style={{ fontSize: 15, color: "var(--text)", padding: "8px 0" }}>
+            How It Works
+          </Link>
+          <Link href="#tracks" onClick={() => setMobileNavOpen(false)} style={{ fontSize: 15, color: "var(--text)", padding: "8px 0" }}>
+            Two Tracks
+          </Link>
+          <Link href="/campus" onClick={() => setMobileNavOpen(false)} style={{ fontSize: 15, color: "var(--indigo)", padding: "8px 0", fontWeight: 600 }}>
+            🏛️ For Colleges &amp; Campus
+          </Link>
+          <Link href="/pricing" onClick={() => setMobileNavOpen(false)} style={{ fontSize: 15, color: "var(--text)", padding: "8px 0" }}>
+            Pricing
+          </Link>
+          <Link href="/leaderboard" onClick={() => setMobileNavOpen(false)} style={{ fontSize: 15, color: "var(--text)", padding: "8px 0" }}>
+            Leaderboard
+          </Link>
+          <button
+            className="btn-primary"
+            onClick={() => { setMobileNavOpen(false); setRoleModalOpen(true); }}
+            style={{ width: "100%", justifyContent: "center", padding: "12px", marginTop: 8 }}
+          >
+            Sign In / Join Arena
+          </button>
+        </div>
+      )}
 
       <main>
         {/* HERO SECTION */}
@@ -1136,41 +1230,43 @@ export default function LandingPage() {
                 Updated in real time
               </span>
             </div>
-            <table className="feed-table">
-              <thead>
-                <tr>
-                  <th>Engineers</th>
-                  <th>Challenge Ticket</th>
-                  <th>Track</th>
-                  <th>Outcome</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { p1: "RD", p2: "BOT", names: "Rishabh9877 vs CodeSentinel AI (Bot)", prob: "PR #108: Token Bucket Rate Limiter", track: "Cloud SWE · TS", result: "Win +16 ELO", win: true },
-                  { p1: "VA", p2: "BOT", names: "vivaanarora vs CodeSentinel AI (Bot)", prob: "Issue #44: UART Ring Buffer Telemetry", track: "Embedded · C", result: "Win +18 ELO", win: true },
-                  { p1: "RD", p2: "VA", names: "Rishabh9877 vs vivaanarora", prob: "Issue #89: Cortex-M0 Unaligned HardFault", track: "Embedded · C", result: "Win +19 ELO", win: true },
-                  { p1: "G1", p2: "BOT", names: "Guest_Alpha vs CodeSentinel AI (Bot)", prob: "PR #212: Exponential Retry Jitter", track: "Cloud SWE · TS", result: "Win +17 ELO", win: true },
-                ].map((row, i) => (
-                  <tr key={i}>
-                    <td>
-                      <span style={{ fontWeight: 600 }}>{row.names}</span>
-                    </td>
-                    <td><span style={{ color: "var(--muted2)", fontFamily: "'JetBrains Mono', monospace", fontSize: "12px" }}>{row.prob}</span></td>
-                    <td>
-                      <span className="feed-badge" style={{ background: "rgba(139,142,255,0.1)", color: "var(--indigo)" }}>
-                        {row.track}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{ fontWeight: 700, color: row.win ? "var(--green)" : "var(--red)", fontFamily: "'JetBrains Mono', monospace", fontSize: "12px" }}>
-                        {row.result}
-                      </span>
-                    </td>
+            <div className="table-responsive">
+              <table className="feed-table">
+                <thead>
+                  <tr>
+                    <th>Engineers</th>
+                    <th>Challenge Ticket</th>
+                    <th>Track</th>
+                    <th>Outcome</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {[
+                    { p1: "RD", p2: "BOT", names: "Rishabh9877 vs CodeSentinel AI (Bot)", prob: "PR #108: Token Bucket Rate Limiter", track: "Cloud SWE · TS", result: "Win +16 ELO", win: true },
+                    { p1: "VA", p2: "BOT", names: "vivaanarora vs CodeSentinel AI (Bot)", prob: "Issue #44: UART Ring Buffer Telemetry", track: "Embedded · C", result: "Win +18 ELO", win: true },
+                    { p1: "RD", p2: "VA", names: "Rishabh9877 vs vivaanarora", prob: "Issue #89: Cortex-M0 Unaligned HardFault", track: "Embedded · C", result: "Win +19 ELO", win: true },
+                    { p1: "G1", p2: "BOT", names: "Guest_Alpha vs CodeSentinel AI (Bot)", prob: "PR #212: Exponential Retry Jitter", track: "Cloud SWE · TS", result: "Win +17 ELO", win: true },
+                  ].map((row, i) => (
+                    <tr key={i}>
+                      <td>
+                        <span style={{ fontWeight: 600 }}>{row.names}</span>
+                      </td>
+                      <td><span style={{ color: "var(--muted2)", fontFamily: "'JetBrains Mono', monospace", fontSize: "12px" }}>{row.prob}</span></td>
+                      <td>
+                        <span className="feed-badge" style={{ background: "rgba(139,142,255,0.1)", color: "var(--indigo)" }}>
+                          {row.track}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ fontWeight: 700, color: row.win ? "var(--green)" : "var(--red)", fontFamily: "'JetBrains Mono', monospace", fontSize: "12px" }}>
+                          {row.result}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       </main>

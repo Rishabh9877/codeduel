@@ -317,9 +317,10 @@ export default function PricingPage() {
 
         {/* ── PRICING CARDS ──────────────────────────────────────────────── */}
         <div
+          className="pricing-cards-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
             gap: 24,
             marginBottom: 64,
           }}
@@ -490,7 +491,7 @@ export default function PricingPage() {
             See how adopting Codeduel Campus for engineering lab cohorts (e.g., ECE Embedded Firmware or CS Systems) eliminates manual faculty grading and replaces expensive laboratory equipment kits.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 32, alignItems: "center" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 32, alignItems: "center" }}>
             {/* Sliders */}
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div>
@@ -538,7 +539,7 @@ export default function PricingPage() {
                 borderRadius: 12,
                 padding: 24,
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
                 gap: 20,
               }}
             >

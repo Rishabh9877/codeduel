@@ -333,11 +333,15 @@ export default function LeaderboardPage() {
 
         /* responsive */
         @media (max-width: 600px) {
-          .podium-elo  { font-size: 16px; }
-          .p1 .podium-elo { font-size: 20px; }
-          .podium-card { padding: 16px 10px 12px; }
-          .podium-avatar { width: 48px; height: 48px; font-size: 16px; }
-          .p1 .podium-avatar { width: 58px; height: 58px; }
+          .podium-section { padding: 20px 8px 0; }
+          .podium-row { gap: 8px; }
+          .podium-elo  { font-size: 15px; }
+          .p1 .podium-elo { font-size: 18px; }
+          .podium-card { padding: 12px 6px 10px; }
+          .podium-avatar { width: 44px; height: 44px; font-size: 14px; }
+          .p1 .podium-avatar { width: 52px; height: 52px; }
+          .podium-username { font-size: 11px; }
+          .p1 .podium-username { font-size: 13px; }
         }
       `}</style>
 
@@ -517,7 +521,8 @@ export default function LeaderboardPage() {
               <p>No rankings found for this track yet.</p>
             </div>
           ) : (
-            <table className="lb-table">
+            <div className="table-responsive">
+              <table className="lb-table">
               <thead>
                 <tr>
                   <th style={{ width: 64 }}>Rank</th>
@@ -604,6 +609,7 @@ export default function LeaderboardPage() {
                 })}
               </tbody>
             </table>
+          </div>
           )}
         </div>
 
